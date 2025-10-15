@@ -1,0 +1,48 @@
+# ——— Node.js / TypeScript project ———
+
+# Folder with dependencies
+node_modules/
+
+# Settings and secrets
+.env
+.env.*
+*.env
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Current files
+dist/
+build/
+.out/
+.tmp/
+.cache/
+coverage/
+
+# TypeScript build info
+*.tsbuildinfo
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+
+.DS_Store
+Thumbs.db
+
+# OS/JetBrains
+*.iml
+*.log
+
+vite.config.ts.timestamp*
+vite-env.d.ts
+
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
+
+ngrok.yml
