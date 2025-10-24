@@ -29,7 +29,7 @@ import sendNotificationEmail  from './emailService';
 import { v2 as cloudinary } from 'cloudinary';
 dotenv.config();
 
-const PORT = process.env.PORT || 5000;
+const port = Number(process.env.PORT) || 5000;
 const MONGO_DB = process.env.MONGO_DB;
 const CLOUDINARY_API_SECRET = process.env.CLOUDINARY_API_SECRET;
 const CLOUDINARY_API_KEY = process.env.CLOUDINARY_API_KEY;
@@ -687,6 +687,6 @@ app.use(AgentsRoutes);
 app.use(CommentsRoutes);
 
 //Server
-app.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+app.listen(port,  '0.0.0.0',() => {
+    console.log(`Server running on http://localhost:${port}`);
 });
