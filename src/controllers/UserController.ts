@@ -2,7 +2,7 @@ import User from "../models/UserModel";
 import mongoose from "mongoose";
 import ListingModel from "../models/ListingModel";
 import CommentModel from "../models/CommentModel";
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 
 export const handleDeleteUserByUserName = async (req: any, res: any) => {
     try {

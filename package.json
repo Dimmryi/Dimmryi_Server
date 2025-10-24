@@ -13,7 +13,7 @@
   "dependencies": {
     "@ngrok/ngrok": "^1.5.2",
     "@types/mongoose": "^5.11.97",
-    "bcrypt": "^5.1.1",
+    "bcryptjs": "^3.0.2",
     "body-parser": "^2.2.0",
     "cloudinary": "^2.6.1",
     "connect-mongo": "^5.1.0",

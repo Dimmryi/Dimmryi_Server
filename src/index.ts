@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 import ngrok from '@ngrok/ngrok';
 import bodyParser from 'body-parser';
 import crypto from 'crypto';
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 import { OAuth2Client } from 'google-auth-library';
 import jwt from 'jsonwebtoken';
 import session, {SessionData} from 'express-session';
@@ -13,7 +13,6 @@ import cors from 'cors';
 import listingRoutes from './routes/ListingRoutes';
 import ListingModel from "./models/ListingModel";
 import 'express-session';
-//import 'express';
 import dotenv from 'dotenv';
 import User from "./models/UserModel";
 import UserRoutes from './routes/UserRoutes';
@@ -130,7 +129,7 @@ app.use(session({
         ttl: 24 * 60 * 60 // 1 day
     }),
     cookie: {
-        secure: false, // true only with HTTPS //!!!!!!!!!!!!!!!!!! Change to "true" before uploading to production!!!
+        secure: true, // true only with HTTPS //!!!!!!!!!!!!!!!!!! Change to "true" before uploading to production!!!
         httpOnly: true,
         maxAge: 1000 * 60 * 60 * 24, // 1 Day of a cookie's life
         sameSite: 'lax',
