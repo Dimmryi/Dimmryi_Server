@@ -686,6 +686,11 @@ app.use(ListingRoutes);
 app.use(AgentsRoutes);
 app.use(CommentsRoutes);
 
+//Health Check Path for Rendor.com
+app.get("/healthz", (req, res) => {
+    res.json({ status: "ok", message: "Server is running" });
+});
+
 //Server
 app.listen(port,  '0.0.0.0',() => {
     console.log(`Server running on http://0.0.0.0:${port}`);
