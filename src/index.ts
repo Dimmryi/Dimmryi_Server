@@ -629,8 +629,10 @@ app.post('/api/auth/google', async (req:any, res:any) => {
 
 // Session check
 app.get('/session', (req, res) => {
-    if (req.session.user) {
-        res.json({ user: req.session.user, message:'Session is active' });
+    //if (req.session.user) {
+    if (req.session.cookie) {
+        //res.json({ user: req.session.user, message:'Session is active' });
+        res.json({ user: req.session.cookie.expires, message:'Session is active' });
     } else {
         res.status(401).json({ message: 'No active session' });
     }
