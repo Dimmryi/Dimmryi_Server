@@ -133,7 +133,7 @@ app.use(session({
         secure: true,
         httpOnly: true,
         maxAge: 1000 * 60 * 60 * 24, // 1 Day of a cookie's life
-        sameSite: 'none ',  //'lax',
+        sameSite: 'none',  //'lax',
     },
 }));
 
