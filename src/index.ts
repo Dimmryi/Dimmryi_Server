@@ -105,7 +105,8 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use(cors({
-    origin: 'http://localhost:5173', // Allowing requests from the front
+    //origin: 'http://localhost:5173', // Allowing requests from the front
+    origin: ["http://localhost:5173", "http://127.0.0.1:5173"], // Vite dev server
     credentials: true,
     allowedHeaders: ['Content-Type', 'Authorization'],
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
@@ -129,10 +130,10 @@ app.use(session({
         ttl: 24 * 60 * 60 // 1 day
     }),
     cookie: {
-        secure: true, // true only with HTTPS //!!!!!!!!!!!!!!!!!! Change to "true" before uploading to production!!!
+        secure: true,
         httpOnly: true,
         maxAge: 1000 * 60 * 60 * 24, // 1 Day of a cookie's life
-        sameSite: 'lax',
+        sameSite: 'none ',  //'lax',
     },
 }));
 
@@ -272,17 +273,22 @@ app.post('/saveImageUrl', async (req, res) => {
 });
 
 app.get('/check-auth', async (req, res) => {
-    if (req.session.user) {
-        res.json({
-            isAuthenticated: true,
-            user: req.session.user,
-            id: req.session.id.toString(),
-        });
-    } else {
-        res.json({
-            isAuthenticated: false
-        });
+    try {
+        if (req.session.user) {
+            res.json({
+                isAuthenticated: true,
+                user: req.session.user,
+                id: req.session.id.toString(),
+            });
+        } else {
+            res.json({
+                isAuthenticated: false
+            });
+        }
+    }catch (error) {
+        res.status(500).json({ error: 'Server error' });
     }
+
 });
 
 app.get('/api/ads', async (req, res) => {
@@ -686,7 +692,7 @@ app.use(ListingRoutes);
 app.use(AgentsRoutes);
 app.use(CommentsRoutes);
 
-//Health Check Path for Rendor.com
+//Health Check Path for Render.com
 app.get("/healthz", (req, res) => {
     res.json({ status: "ok", message: "Server is running" });
 });
