@@ -134,10 +134,10 @@ app.use(session({
         ttl: 24 * 60 * 60 // 1 day
     }),
     cookie: {
-        secure: false, //true, //false
+        secure: true, //false
         httpOnly: true,
         maxAge: 1000 * 60 * 60 * 24, // 1 Day of a cookie's life
-        sameSite: 'lax',//'none',  //'lax',
+        sameSite: 'none',  //'lax',
     },
 }));
 
@@ -276,7 +276,7 @@ app.post('/saveImageUrl', async (req, res) => {
     }
 });
 
-app.get('/check-auth', async (req, res) => {
+app.get('/check-auth', async (req:any, res:any) => {
     try {
         if (req.session.user) {
             res.json({
@@ -633,11 +633,11 @@ app.post('/api/auth/google', async (req:any, res:any) => {
 });
 
 // Session check
-app.get('/session', (req, res) => {
+app.get('/session', (req:any, res:any) => {
     //if (req.session.user) {
     if (req.session.cookie) {
         //res.json({ user: req.session.user, message:'Session is active' });
-        res.json({ user: req.session.cookie.expires, message:'Session is active' });
+        res.json({ user: req.session.cookie.name, expires: req.session.cookie.expires, message:'Session is active' });
     } else {
         res.status(401).json({ message: 'No active session' });
     }
