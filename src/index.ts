@@ -120,6 +120,9 @@ app.use(cors({
 //     next();
 // };
 
+// Without this line, Express considers the connection to be non-HTTPS.
+app.set('trust proxy', 1);
+
 // Setting up sessions
 app.use(session({
     secret: `${COOKIE_SECRET}`,
@@ -279,6 +282,7 @@ app.get('/check-auth', async (req, res) => {
                 isAuthenticated: true,
                 user: req.session.user,
                 id: req.session.id.toString(),
+                cookieExpires: req.session.cookie.expires,
             });
         } else {
             res.json({
