@@ -89,21 +89,11 @@ export const authenticateJWT = (req:any, res:any, next:any) => {
     });
 };
 
-// Protected route
-app.get('/api/protected', authenticateJWT, (req:any, res:any) => {
-    res.json({ message: `Hello ${req.user?.userId}` });
-});
-
 // Generating a JWT token
 function generateSessionToken(userId: string) {
     return jwt.sign({ userId }, JWT_SECRET || "", { expiresIn: '1h' });
 }
 
-// Middleware
-app.use(express.json());
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
-app.use(cookieParser());
 app.use(cors({
     //origin: 'http://localhost:5173', // Allowing requests from the front
     origin: ["http://localhost:5173", "http://127.0.0.1:5173"], // Vite dev server
@@ -111,6 +101,17 @@ app.use(cors({
     allowedHeaders: ['Content-Type', 'Authorization'],
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
 }));
+
+// Middleware
+app.use(express.json());
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
+app.use(cookieParser());
+
+// Protected route
+app.get('/api/protected', authenticateJWT, (req:any, res:any) => {
+    res.json({ message: `Hello ${req.user?.userId}` });
+});
 
 // General middleware for authorization checking
 // const checkAuth = (req:any, res:any, next: NextFunction) => {
@@ -133,10 +134,10 @@ app.use(session({
         ttl: 24 * 60 * 60 // 1 day
     }),
     cookie: {
-        secure: true,
+        secure: false, //true, //false
         httpOnly: true,
         maxAge: 1000 * 60 * 60 * 24, // 1 Day of a cookie's life
-        sameSite: 'none',  //'lax',
+        sameSite: 'lax',//'none',  //'lax',
     },
 }));
 
