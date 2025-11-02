@@ -637,7 +637,7 @@ app.get('/session', (req:any, res:any) => {
     //if (req.session.user) {
     if (req.session.cookie) {
         //res.json({ user: req.session.user, message:'Session is active' });
-        res.json({ user: req.session.cookie.name, expires: req.session.cookie.expires, message:'Session is active' });
+        res.json({ user: req.session.user?.name, expires: req.session.cookie.expires, message:'Session is active' });
     } else {
         res.status(401).json({ message: 'No active session' });
     }
