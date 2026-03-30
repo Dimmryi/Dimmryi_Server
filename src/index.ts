@@ -281,8 +281,7 @@ app.get('/check-auth', async (req:any, res:any) => {
         if (req.session.user) {
             res.json({
                 isAuthenticated: true,
-                user: req.session?.user.name,
-                name: req.session?.session?.user.name,
+                user: req.session?.user?.name,
                 id: req.session?.id.toString(),
                 cookieExpires: req.session.cookie.expires,
             });
