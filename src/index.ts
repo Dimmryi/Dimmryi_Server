@@ -360,7 +360,7 @@ app.post('/api/ads/modified-string', async (req:any, res:any) => {
 
 app.get('/api/ads/featured', async (req:any, res:any) => {
     try {
-        const ad = await AdsModel.findOne({ isFeatured: true });
+        const ad = await AdsModel.find({ isFeatured: true });
 
         if (!ad) {
             return res.status(404).json({ message: 'No featured ad found' });
