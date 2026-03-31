@@ -358,6 +358,15 @@ app.post('/api/ads/modified-string', async (req:any, res:any) => {
     }
 });
 
+app.get('/api/ad', async (req, res) => {
+    try{
+        const ad = await AdsModel.findOne({ isFeatured: true });
+        res.json(ad);
+    }catch (error) {
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
 app.get('/api/ads/featured', async (req:any, res:any) => {
     try {
         const ad = await AdsModel.find();
