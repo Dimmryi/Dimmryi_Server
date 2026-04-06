@@ -9,6 +9,8 @@ export interface IUser extends Document {
     googleId?: string;
     preferredContact?: string;
     contact?: string;
+    passwordResetToken?: string | null;
+    passwordResetExpires?: any | null;
     authMethod?: string;
     role: string;
 }
@@ -20,6 +22,8 @@ const UserSchema: Schema = new Schema({
     googleId: String,
     preferredContact: { type: String, required: false },
     contact: { type: String, required: false },
+    passwordResetToken:   { type: String, default: null },
+    passwordResetExpires: { type: Date,   default: null },
     authMethod: {
         type: String,
         enum: ['password', 'google'],

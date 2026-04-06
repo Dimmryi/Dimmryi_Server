@@ -29,6 +29,14 @@ import sendNotificationEmail  from './emailService';
 import { v2 as cloudinary } from 'cloudinary';
 dotenv.config();
 
+//We check all the necessary variables *****
+const requiredEnvVars = ['MONGO_DB', 'JWT_SECRET', 'COOKIE_SECRET', 'GOOGLE_CLIENT_ID'];
+for (const varName of requiredEnvVars) {
+    if (!process.env[varName]) {
+        throw new Error(`Missing required environment variable: ${varName}`);
+    }
+}
+
 const port = Number(process.env.PORT) || 5000;
 const MONGO_DB = process.env.MONGO_DB;
 const CLOUDINARY_API_SECRET = process.env.CLOUDINARY_API_SECRET;
@@ -38,6 +46,9 @@ const CLOUD_NAME = process.env.CLOUD_NAME;
 const SECRET = process.env.SECRET_TOKEN;
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const JWT_SECRET = process.env.JWT_SECRET;
+
+//Password reset token expiration time (30 minutes in milliseconds).*****
+const PASSWORD_RESET_TOKEN_TTL_MS = 30 * 60 * 1000;
 
 const client = new OAuth2Client(GOOGLE_CLIENT_ID);
 const app = express();
@@ -104,7 +115,7 @@ app.use(cors({
 
 // Middleware
 app.use(express.json());
-app.use(bodyParser.json());
+//app.use(bodyParser.json()); //duplicates the line above *****
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(cookieParser());
 
@@ -112,14 +123,6 @@ app.use(cookieParser());
 app.get('/api/protected', authenticateJWT, (req:any, res:any) => {
     res.json({ message: `Hello ${req.user?.userId}` });
 });
-
-// General middleware for authorization checking
-// const checkAuth = (req:any, res:any, next: NextFunction) => {
-//     if (!req.session.user) {
-//         return res.status(401).json({ message: "Not authenticated" });
-//     }
-//     next();
-// };
 
 // Without this line, Express considers the connection to be non-HTTPS.
 app.set('trust proxy', 1);
@@ -131,12 +134,12 @@ app.use(session({
     saveUninitialized: false,
     store: MongoStore.create({
         mongoUrl: MONGO_DB,
-        ttl: 24 * 60 * 60 // 1 day
+        ttl: 7 * 24 * 60 * 60 // 7 days
     }),
     cookie: {
         secure: true, //false
         httpOnly: true,
-        maxAge: 1000 * 60 * 60 * 24, // 1 Day of a cookie's life
+        maxAge: 1000 * 60 * 60 * 24 * 7, // 7 Days of a cookie's life
         sameSite: 'none',  //'lax',
     },
 }));
@@ -148,6 +151,8 @@ mongoose.connect(`${MONGO_DB}`)
     })
     .catch((err) => {
         console.error('Error connecting to MongoDB:', err);
+        //Without this, the server will start, but all database queries will fail.*****
+        process.exit(1);
     });
 
 // Keys to LiqPay (you need to register to receive them!)
@@ -367,21 +372,6 @@ app.get('/api/ad', async (req, res) => {
     }
 });
 
-app.get('/api/ads/featured', async (req:any, res:any) => {
-    try {
-        const ad = await AdsModel.find();
-        //{ isFeatured: true }
-
-        if (!ad) {
-            return res.status(404).json({ message: 'No featured ad found' });
-        }
-
-        res.json(ad);
-    } catch (error) {
-        res.status(500).json({ error: 'Failed to fetch featured ad' });
-    }
-});
-
 app.delete('/api/ads/:publicId', async (req:any, res:any) => {
     try{
         const { publicId } = req.params;
@@ -572,6 +562,7 @@ app.post('/login', async (req:any , res:any): Promise<void>  => {
             role: user.role,
             authMethod: user.authMethod,
         };
+        await req.session.save();
 
         res.json({
             user: {
@@ -581,8 +572,6 @@ app.post('/login', async (req:any , res:any): Promise<void>  => {
                 authMethod: user.authMethod,
             }
         });
-
-        await req.session.save();
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Server error' });
@@ -593,11 +582,6 @@ app.post('/login', async (req:any , res:any): Promise<void>  => {
 app.post('/api/auth/google', async (req:any, res:any) => {
     try {
         const { token: googleToken } = req.body;
-        // Token verification
-        // const ticket = await client.verifyIdToken({
-        //     idToken: googleToken,
-        //     audience: process.env.GOOGLE_CLIENT_ID
-        // });
         const payload = await verifyGoogleToken(googleToken);
 
         if (!payload) {
@@ -612,6 +596,15 @@ app.post('/api/auth/google', async (req:any, res:any) => {
             ]
         });
 
+        // If a user is found by email but registered with a password,
+        // we return a 409 response.*****
+        if (user && user.authMethod === 'password') {
+            return res.status(409).json({
+                message: 'This email is registered with password. Please log in with password.',
+                email: user.email,
+            });
+        }
+
         // Creating a new user on first login
         if (!user) {
             user = new User({
@@ -623,11 +616,22 @@ app.post('/api/auth/google', async (req:any, res:any) => {
             await user.save();
         }
 
+        // For Google authorization, we also create a session.*****
+        req.session.user = {
+            id: user._id.toString(),
+            name: user.name,
+            email: user.email,
+            role: user.role,
+            authMethod: 'google',
+        };
+        await req.session.save();
+
         // Creating a session token
         const sessionToken = generateSessionToken(user._id.toString());
 
         res.json({
             success: true,
+            message: 'Google authentication successful',
             token: sessionToken,
             user: {
                 id: user._id.toString(),
@@ -702,6 +706,188 @@ app.post("/generate-signature-video", (req, res) => {
         timestamp,
         api_key: process.env.CLOUDINARY_API_KEY,
     });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// НОВЫЕ ЭНДПОИНТЫ: Сброс пароля
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+app.post('/api/auth/forgot-password', async (req: any, res: any) => {
+    try {
+        const { email } = req.body;
+
+        if (!email || typeof email !== 'string') {
+            return res.status(400).json({ message: 'Email is required.' });
+        }
+
+        const user = await User.findOne({ email: email.toLowerCase().trim() });
+
+        // ─── Если пользователь не найден — всё равно возвращаем 200,
+        // чтобы злоумышленник не мог определить какие email зарегистрированы.
+        if (!user) {
+            return res.status(200).json({ message: 'If this email exists, a reset link has been sent.' });
+        }
+
+        // ─── Если пользователь зарегистрирован через Google — пароля нет,
+        // сброс бессмысленен. Предлагаем войти через Google.
+        if (user.authMethod === 'google') {
+            // Отправляем 200 по той же причине безопасности, но в письме
+            // объясняем ситуацию.
+            await sendNotificationEmail(
+                user.email,
+                'Інформація про ваш акаунт — Дім мрії App',
+                `Привіт, ${user.name}!
+
+Ви запросили скидання пароля, але ваш акаунт підключено через Google.
+
+Для входу натисніть кнопку "Увійти через Google" на сторінці авторизації.
+
+Якщо ви не робили цей запит — проігноруйте цей лист.
+
+З повагою,
+Команда Дім мрії App`
+            );
+            return res.status(200).json({ message: 'If this email exists, a reset link has been sent.' });
+        }
+
+        // ─── Генерируем криптографически стойкий токен (32 байта = 64 hex-символа).
+        // crypto уже импортирован в проекте — используем его.
+        const resetToken = crypto.randomBytes(32).toString('hex');
+        const resetExpires = new Date(Date.now() + PASSWORD_RESET_TOKEN_TTL_MS);
+
+        // ─── Сохраняем токен в БД. Токен не хэшируем для простоты,
+        // но для продакшна можно добавить: crypto.createHash('sha256').update(resetToken).digest('hex')
+        await User.findByIdAndUpdate(user._id, {
+            passwordResetToken: resetToken,
+            passwordResetExpires: resetExpires,
+        });
+
+        // ─── Формируем ссылку для письма.
+        // VITE_FRONTEND_URL должен быть в .env: например https://yoursite.com
+        const frontendUrl = process.env.VITE_FRONTEND_URL || 'http://localhost:5173';
+        const resetUrl = `${frontendUrl}/reset-password?token=${resetToken}`;
+
+        await sendNotificationEmail(
+            user.email,
+            'Скидання пароля — Дім мрії App',
+            `Привіт, ${user.name}!
+
+Ми отримали запит на скидання пароля для вашого акаунту.
+
+Натисніть на посилання нижче або скопіюйте його у браузер:
+${resetUrl}
+
+⏱ Посилання дійсне протягом 30 хвилин.
+
+Якщо ви не запитували скидання пароля — просто проігноруйте цей лист.
+Ваш пароль залишиться без змін.
+
+З повагою,
+Команда Дім мрії App`
+        );
+
+        res.status(200).json({ message: 'If this email exists, a reset link has been sent.' });
+
+    } catch (error) {
+        console.error('Forgot password error:', error);
+        res.status(500).json({ error: 'Server error. Please try again later.' });
+    }
+});
+
+// ─── 2. Валидация токена (GET) ────────────────────────────────────────────────
+// Клиент вызывает этот эндпоинт сразу при открытии страницы /reset-password,
+// чтобы сообщить пользователю о просроченной ссылке ДО заполнения формы.
+// Принимает: ?token=...
+// Возвращает: 200 если токен валиден, 410 если истёк или не найден.
+
+app.get('/api/auth/reset-password/validate', async (req: any, res: any) => {
+    try {
+        const { token } = req.query;
+
+        if (!token || typeof token !== 'string') {
+            return res.status(400).json({ message: 'Token is required.' });
+        }
+
+        const user = await User.findOne({
+            passwordResetToken: token,
+            passwordResetExpires: { $gt: new Date() }, // токен ещё не истёк
+        });
+
+        if (!user) {
+            // 410 Gone — ресурс больше недоступен (токен истёк или использован)
+            return res.status(410).json({ message: 'Reset link has expired or already been used.' });
+        }
+
+        res.status(200).json({ message: 'Token is valid.' });
+
+    } catch (error) {
+        console.error('Token validation error:', error);
+        res.status(500).json({ error: 'Server error.' });
+    }
+});
+
+// ─── 3. Установка нового пароля (POST) ───────────────────────────────────────
+// Принимает: { token: string, password: string }
+// Хэширует новый пароль через bcrypt (уже используется в проекте),
+// сохраняет и удаляет токен из БД (одноразовое использование).
+
+app.post('/api/auth/reset-password', async (req: any, res: any) => {
+    try {
+        const { token, password } = req.body;
+
+        if (!token || !password) {
+            return res.status(400).json({ message: 'Token and password are required.' });
+        }
+
+        if (typeof password !== 'string' || password.length < 8) {
+            return res.status(400).json({ message: 'Password must be at least 8 characters.' });
+        }
+
+        const user = await User.findOne({
+            passwordResetToken: token,
+            passwordResetExpires: { $gt: new Date() },
+        });
+
+        if (!user) {
+            return res.status(410).json({ message: 'Reset link has expired or already been used.' });
+        }
+
+        // ─── Хэшируем новый пароль. Используем bcrypt — он уже есть в проекте.
+        // Раунд 12 — хороший баланс между безопасностью и скоростью.
+        const hashedPassword = await bcrypt.hash(password, 12);
+
+        // ─── Сохраняем новый пароль и удаляем токен (одноразовое использование).
+        // Также обновляем authMethod на 'password' на случай если пользователь
+        // ранее использовал другой метод.
+        await User.findByIdAndUpdate(user._id, {
+            password: hashedPassword,
+            authMethod: 'password',
+            passwordResetToken: null,
+            passwordResetExpires: null,
+        });
+
+        // ─── Уведомляем пользователя об успешной смене пароля.
+        // Это важная security-мера: если пользователь не менял пароль сам,
+        // он узнает об этом и сможет принять меры.
+        await sendNotificationEmail(
+            user.email,
+            'Пароль успішно змінено — Дім мрії App',
+            `Привіт, ${user.name}!
+
+Ваш пароль на Real Estate App було успішно змінено.
+
+Якщо ви не робили цю зміну — негайно зв'яжіться з нами, відповівши на цей лист.
+
+З повагою,
+Команда Дім мрії App`
+        );
+
+        res.status(200).json({ message: 'Password successfully updated.' });
+
+    } catch (error) {
+        console.error('Reset password error:', error);
+        res.status(500).json({ error: 'Server error. Please try again later.' });
+    }
 });
 
 app.use(UserRoutes);
