@@ -29,7 +29,8 @@
 // export default sendNotificationEmail;
 // //module.exports = { sendNotificationEmail };
 
-import nodemailer from 'nodemailer';
+//import nodemailer from 'nodemailer';
+const nodemailer = require('nodemailer');
 import dotenv from 'dotenv';
 dotenv.config();
 
@@ -44,7 +45,7 @@ const transporter = nodemailer.createTransport({
 });
 
 // Диагностика при старте — убери после проверки
-transporter.verify((error) => {
+transporter.verify((error:any) => {
     if (error) {
         console.error('❌ Nodemailer error:', error.message);
     } else {
