@@ -25,7 +25,7 @@ import ListingRoutes from "./routes/ListingRoutes";
 import NotificationModel from "./models/NotificationModel";
 import haversine from 'haversine-distance';
 import { getNextListingNumber } from './utils/getNextListingNumber';
-import sendNotificationEmail  from './emailService';
+import sendNotificationEmail, {sendEmail} from './emailService';
 import { v2 as cloudinary } from 'cloudinary';
 dotenv.config();
 
@@ -746,6 +746,13 @@ app.post('/api/auth/forgot-password', async (req: any, res: any) => {
                 <p>З повагою,</p></br>
                 <p>Команда Дім мрії App</p>`
             });
+
+            await sendEmail(
+                user.email,
+                'Інформація про ваш акаунт — Дім мрії App',
+                `Ви запросили скидання пароля, але ваш акаунт підключено через Google.`
+            );
+
             return res.status(200).json({ message: 'If this email exists, a reset link has been sent.' });
         }
 
@@ -779,6 +786,12 @@ app.post('/api/auth/forgot-password', async (req: any, res: any) => {
             <p>З повагою,</p></br>
             <p>Команда Дім мрії App</p>`
         });
+
+        await sendEmail(
+            user.email,
+            'Інформація про ваш акаунт — Дім мрії App',
+            `Ви запросили скидання пароля, але ваш акаунт підключено через Google.`
+        );
 
         res.status(200).json({ message: 'If this email exists, a reset link has been sent.' });
 

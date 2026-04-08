@@ -1,9 +1,10 @@
 import dotenv from "dotenv";
 import {CreateEmailResponse, Resend} from 'resend';
 dotenv.config();
+const nodemailer = require('nodemailer');
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-const sendNotificationEmail  = async ({ to, subject, html }:{to:any,subject:any,html:any}) => {
+export const sendNotificationEmail  = async ({ to, subject, html }:{to:any,subject:any,html:any}) => {
     try {
         const response: CreateEmailResponse = await resend.emails.send({
             from: `"My Dream House App" <${process.env.APP_EMAIL}>` || `onboarding@resend.dev`,
@@ -19,7 +20,29 @@ const sendNotificationEmail  = async ({ to, subject, html }:{to:any,subject:any,
     }
 };
 
-export default sendNotificationEmail;
+const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.APP_PASSWORD,
+    },
+});
+
+export const sendEmail = async (to:any, subject:any, text:any) => {
+    try {
+        await transporter.sendMail({
+            from: '"Real Estate App" <your_email@gmail.com>',
+            to,
+            subject,
+            text,
+        });
+        console.log(`Email sent to ${to}`);
+    } catch (error) {
+        console.error('Failed to send email:', error);
+    }
+};
+
+//export default sendNotificationEmail;
 //****************************************************************************************
 // import dotenv from "dotenv";
 //
