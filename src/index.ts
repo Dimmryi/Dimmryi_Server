@@ -253,15 +253,18 @@ app.post('/api/listingsWithComparison', async (req, res) => {
         for (const match of matchedNotifications) {
             const { email } = match;
 
-            await sendNotificationEmail(
-                email,
-                'New listing matches your preferences',
-                `A new property listing matches your preferences:
-                Price: ${newListing.price}\nType of advertisement: ${newListing.listingType}
-                Number of rooms: ${newListing.numbersOfRooms}\nTotal area: ${newListing.totalArea}
-                Number of floor: ${newListing.numberOfFloor}\nDistance to the desired point: ${distance}
-                Visit the site to view it.`
-            );
+            await sendNotificationEmail({
+                to: email,
+                subject: 'New listing matches your preferences',
+                html: `<h2>A new property listing matches your preferences:</h2>
+                <p>Price: ${newListing.price}</p></br>
+                <p>Type of advertisement: ${newListing.listingType}</p></br>
+                <p>Number of rooms: ${newListing.numbersOfRooms}</p></br>
+                <p>Total area: ${newListing.totalArea}</p></br>
+                <p>Number of floor: ${newListing.numberOfFloor}</p></br>
+                <p>Distance to the desired point: ${distance}</p></br>
+                <p>Visit the site to view it.</p>`
+            });
         }
         res.status(201).json({ message: 'Listing created and notifications sent.' });
     } catch (error) {
@@ -733,20 +736,16 @@ app.post('/api/auth/forgot-password', async (req: any, res: any) => {
         if (user.authMethod === 'google') {
             // Отправляем 200 по той же причине безопасности, но в письме
             // объясняем ситуацию.
-            await sendNotificationEmail(
-                user.email,
-                'Інформація про ваш акаунт — Дім мрії App',
-                `Привіт, ${user.name}!
-
-Ви запросили скидання пароля, але ваш акаунт підключено через Google.
-
-Для входу натисніть кнопку "Увійти через Google" на сторінці авторизації.
-
-Якщо ви не робили цей запит — проігноруйте цей лист.
-
-З повагою,
-Команда Дім мрії App`
-            );
+            await sendNotificationEmail({
+                to: user.email,
+                subject: 'Інформація про ваш акаунт — Дім мрії App',
+                html:`<h1>Привіт, ${user.name}!</h1>
+                <p>Ви запросили скидання пароля, але ваш акаунт підключено через Google.</p></br>
+                <p>Для входу натисніть кнопку "Увійти через Google" на сторінці авторизації.</p></br>
+                <p>Якщо ви не робили цей запит — проігноруйте цей лист.</p></br>
+                <p>З повагою,</p></br>
+                <p>Команда Дім мрії App</p>`
+            });
             return res.status(200).json({ message: 'If this email exists, a reset link has been sent.' });
         }
 
@@ -767,24 +766,19 @@ app.post('/api/auth/forgot-password', async (req: any, res: any) => {
         const frontendUrl = process.env.VITE_FRONTEND_URL || 'http://localhost:5173';
         const resetUrl = `${frontendUrl}/reset-password?token=${resetToken}`;
 
-        await sendNotificationEmail(
-            user.email,
-            'Скидання пароля — Дім мрії App',
-            `Привіт, ${user.name}!
-
-Ми отримали запит на скидання пароля для вашого акаунту.
-
-Натисніть на посилання нижче або скопіюйте його у браузер:
-${resetUrl}
-
-⏱ Посилання дійсне протягом 30 хвилин.
-
-Якщо ви не запитували скидання пароля — просто проігноруйте цей лист.
-Ваш пароль залишиться без змін.
-
-З повагою,
-Команда Дім мрії App`
-        );
+        await sendNotificationEmail({
+            to: `${user.email}`,
+            subject:'Скидання пароля — Дім мрії App',
+            html: `<h1>Привіт, ${user.name}!</h1>
+            <p>Ми отримали запит на скидання пароля для вашого акаунту.</p></br>
+            <p>Натисніть на посилання нижче або скопіюйте його у браузер:</p></br>
+            <b>${resetUrl}</b></br>
+            <p>⏱ Посилання дійсне протягом 30 хвилин.</p></br>
+            <p>Якщо ви не запитували скидання пароля — просто проігноруйте цей лист.</p></br>
+            <p>Ваш пароль залишиться без змін.</p></br>
+            <p>З повагою,</p></br>
+            <p>Команда Дім мрії App</p>`
+        });
 
         res.status(200).json({ message: 'If this email exists, a reset link has been sent.' });
 
@@ -869,18 +863,15 @@ app.post('/api/auth/reset-password', async (req: any, res: any) => {
         // ─── Уведомляем пользователя об успешной смене пароля.
         // Это важная security-мера: если пользователь не менял пароль сам,
         // он узнает об этом и сможет принять меры.
-        await sendNotificationEmail(
-            user.email,
-            'Пароль успішно змінено — Дім мрії App',
-            `Привіт, ${user.name}!
-
-Ваш пароль на Real Estate App було успішно змінено.
-
-Якщо ви не робили цю зміну — негайно зв'яжіться з нами, відповівши на цей лист.
-
-З повагою,
-Команда Дім мрії App`
-        );
+        await sendNotificationEmail({
+            to: user.email,
+            subject:'Пароль успішно змінено — Дім мрії App',
+            html: `<h2>Привіт, ${user.name}!</h2>
+            <p>Ваш пароль на Real Estate App було успішно змінено.</p></br>
+            <p>Якщо ви не робили цю зміну — негайно зв'яжіться з нами, відповівши на цей лист.<p/></br>
+            <p>З повагою,</p>
+            <p>.Команда Дім мрії App</p>`
+        });
 
         res.status(200).json({ message: 'Password successfully updated.' });
 
