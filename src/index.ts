@@ -25,7 +25,7 @@ import ListingRoutes from "./routes/ListingRoutes";
 import NotificationModel from "./models/NotificationModel";
 import haversine from 'haversine-distance';
 import { getNextListingNumber } from './utils/getNextListingNumber';
-import sendNotificationEmail, {sendEmail} from './emailService';
+import {sendNotificationEmail, sendEmail} from './emailService';
 import { v2 as cloudinary } from 'cloudinary';
 dotenv.config();
 
