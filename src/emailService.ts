@@ -7,7 +7,8 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 export const sendNotificationEmail  = async ({ to, subject, html }:{to:any,subject:any,html:any}) => {
     try {
         const response: CreateEmailResponse = await resend.emails.send({
-            from: `"My Dream House App" <${process.env.APP_EMAIL}>` || `onboarding@resend.dev`,
+            from: `onboarding@resend.dev`,
+            //`"My Dream House App" <${process.env.APP_EMAIL}>` ||
             to,
             subject,
             html,
