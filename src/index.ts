@@ -265,6 +265,13 @@ app.post('/api/listingsWithComparison', async (req, res) => {
                 <p>Distance to the desired point: ${distance}</p></br>
                 <p>Visit the site to view it.</p>`
             });
+
+            await sendEmail(
+                email,
+                'New listing matches your preferences',
+                `A new property listing matches your preferences: Price: ${newListing.price}`
+            );
+
         }
         res.status(201).json({ message: 'Listing created and notifications sent.' });
     } catch (error) {
@@ -883,7 +890,7 @@ app.post('/api/auth/reset-password', async (req: any, res: any) => {
             <p>Ваш пароль на Real Estate App було успішно змінено.</p></br>
             <p>Якщо ви не робили цю зміну — негайно зв'яжіться з нами, відповівши на цей лист.<p/></br>
             <p>З повагою,</p>
-            <p>.Команда Дім мрії App</p>`
+            <p>Команда Дім мрії App</p>`
         });
 
         res.status(200).json({ message: 'Password successfully updated.' });
