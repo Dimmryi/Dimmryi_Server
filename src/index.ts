@@ -266,11 +266,11 @@ app.post('/api/listingsWithComparison', async (req, res) => {
                 <p>Visit the site to view it.</p>`
             });
 
-            await sendEmail(
-                email,
-                'New listing matches your preferences',
-                `A new property listing matches your preferences: Price: ${newListing.price}`
-            );
+            // await sendEmail(
+            //     email,
+            //     'New listing matches your preferences',
+            //     `A new property listing matches your preferences: Price: ${newListing.price}`
+            // );
 
         }
         res.status(201).json({ message: 'Listing created and notifications sent.' });
@@ -754,11 +754,11 @@ app.post('/api/auth/forgot-password', async (req: any, res: any) => {
                 <p>Команда Дім мрії App</p>`
             });
 
-            await sendEmail(
-                user.email,
-                'Інформація про ваш акаунт — Дім мрії App',
-                `Ви запросили скидання пароля, але ваш акаунт підключено через Google.`
-            );
+            // await sendEmail(
+            //     user.email,
+            //     'Інформація про ваш акаунт — Дім мрії App',
+            //     `Ви запросили скидання пароля, але ваш акаунт підключено через Google.`
+            // );
 
             return res.status(200).json({ message: 'If this email exists, a reset link has been sent.' });
         }
@@ -794,11 +794,11 @@ app.post('/api/auth/forgot-password', async (req: any, res: any) => {
             <p>Команда Дім мрії App</p>`
         });
 
-        await sendEmail(
-            user.email,
-            'Інформація про ваш акаунт — Дім мрії App',
-            `Ви запросили скидання пароля, але ваш акаунт підключено через Google.`
-        );
+        // await sendEmail(
+        //     user.email,
+        //     'Інформація про ваш акаунт — Дім мрії App',
+        //     `Ви запросили скидання пароля, але ваш акаунт підключено через Google.`
+        // );
 
         res.status(200).json({ message: 'If this email exists, a reset link has been sent.' });
 
