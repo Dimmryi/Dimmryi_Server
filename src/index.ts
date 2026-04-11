@@ -246,7 +246,7 @@ app.post('/api/listingsWithComparison', async (req, res) => {
                 lat: notification.lat || 50,
                 lon: notification.lon || 36,
             };
-            distance = haversine(listingCoords, notifCoords); // в метрах
+            distance = Math.round(haversine(listingCoords, notifCoords)); // в метрах
             return distance <= notification.locationRange * 1000;
         });
 
@@ -260,17 +260,13 @@ app.post('/api/listingsWithComparison', async (req, res) => {
                 <p>Price: ${newListing.price}</p></br>
                 <p>Type of advertisement: ${newListing.listingType}</p></br>
                 <p>Number of rooms: ${newListing.numbersOfRooms}</p></br>
-                <p>Total area: ${newListing.totalArea}</p></br>
+                <p>Total area: ${newListing.totalArea} m2</p></br>
                 <p>Number of floor: ${newListing.numberOfFloor}</p></br>
-                <p>Distance to the desired point: ${distance}</p></br>
-                <p>Visit the site to view it.</p>`
+                <p>Distance to the desired point: ${distance} meters</p></br>
+                <p>Visit the site to view it:</p>
+                <b>${process.env.ALLOWED_ORIGINS}/details/${newListing.id}</b>
+                <p>Sincerely, My Dream House App team.</p>`
             });
-
-            // await sendEmail(
-            //     email,
-            //     'New listing matches your preferences',
-            //     `A new property listing matches your preferences: Price: ${newListing.price}`
-            // );
 
         }
         res.status(201).json({ message: 'Listing created and notifications sent.' });
@@ -754,17 +750,10 @@ app.post('/api/auth/forgot-password', async (req: any, res: any) => {
                 <p>Команда Дім мрії App</p>`
             });
 
-            // await sendEmail(
-            //     user.email,
-            //     'Інформація про ваш акаунт — Дім мрії App',
-            //     `Ви запросили скидання пароля, але ваш акаунт підключено через Google.`
-            // );
-
             return res.status(200).json({ message: 'If this email exists, a reset link has been sent.' });
         }
 
         // ─── Генерируем криптографически стойкий токен (32 байта = 64 hex-символа).
-        // crypto уже импортирован в проекте — используем его.
         const resetToken = crypto.randomBytes(32).toString('hex');
         const resetExpires = new Date(Date.now() + PASSWORD_RESET_TOKEN_TTL_MS);
 
@@ -777,7 +766,7 @@ app.post('/api/auth/forgot-password', async (req: any, res: any) => {
 
         // ─── Формируем ссылку для письма.
         // VITE_FRONTEND_URL должен быть в .env: например https://yoursite.com
-        const frontendUrl = process.env.VITE_FRONTEND_URL || 'http://localhost:5173';
+        const frontendUrl = process.env.ALLOWED_ORIGINS || 'http://localhost:5173';
         const resetUrl = `${frontendUrl}/reset-password?token=${resetToken}`;
 
         await sendNotificationEmail({
@@ -793,12 +782,6 @@ app.post('/api/auth/forgot-password', async (req: any, res: any) => {
             <p>З повагою,</p></br>
             <p>Команда Дім мрії App</p>`
         });
-
-        // await sendEmail(
-        //     user.email,
-        //     'Інформація про ваш акаунт — Дім мрії App',
-        //     `Ви запросили скидання пароля, але ваш акаунт підключено через Google.`
-        // );
 
         res.status(200).json({ message: 'If this email exists, a reset link has been sent.' });
 
