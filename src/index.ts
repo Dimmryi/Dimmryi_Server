@@ -307,7 +307,7 @@ app.get('/check-auth', async (req:any, res:any) => {
 
 });
 
-app.get('/api/ads', async (req, res) => {
+app.get('/api/videos', async (req, res) => {
     try{
         const ads = await AdsModel.find();
         res.json(ads);
@@ -316,7 +316,7 @@ app.get('/api/ads', async (req, res) => {
     }
 });
 
-app.post('/api/ads', async (req, res) => {
+app.post('/api/videos', async (req, res) => {
     try{
         const {publicId, adsString, ownerName, videoUrl} = req.body;
         const newAds = new AdsModel({
@@ -369,7 +369,7 @@ app.post('/api/videos/modified-string', async (req:any, res:any) => {
     }
 });
 
-app.get('/api/ad', async (req, res) => {
+app.get('/api/video', async (req, res) => {
     try{
         const ad = await AdsModel.findOne({ isFeatured: true });
         res.json(ad);
