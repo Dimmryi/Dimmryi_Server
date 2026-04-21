@@ -335,7 +335,7 @@ app.post('/api/ads', async (req, res) => {
 });
 
 // Set featured ad by ID (only for admin)
-app.post('/api/ads/set-featured', async (req:any, res:any) => {
+app.post('/api/videos/set-featured', async (req:any, res:any) => {
     const { adId } = req.body;
     try {
         // Reset all previous
@@ -353,7 +353,7 @@ app.post('/api/ads/set-featured', async (req:any, res:any) => {
     }
 });
 
-app.post('/api/ads/modified-string', async (req:any, res:any) => {
+app.post('/api/videos/modified-string', async (req:any, res:any) => {
     const { adId, modifiedString } = req.body;
     try {
         if (!mongoose.Types.ObjectId.isValid(adId)) {
@@ -378,7 +378,7 @@ app.get('/api/ad', async (req, res) => {
     }
 });
 
-app.delete('/api/ads/:publicId', async (req:any, res:any) => {
+app.delete('/api/videos/:publicId', async (req:any, res:any) => {
     try{
         const { publicId } = req.params;
         const deletedVideoUrl = await AdsModel.deleteMany({ publicId });
