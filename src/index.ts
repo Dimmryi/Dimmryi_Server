@@ -381,7 +381,7 @@ app.get('/api/ad', async (req, res) => {
 app.delete('/api/ads/:publicId', async (req:any, res:any) => {
     try{
         const { publicId } = req.params;
-        const deletedVideoUrl = await AdsModel.deleteMany({ publicId : publicId });
+        const deletedVideoUrl = await AdsModel.deleteMany({ publicId });
         if (deletedVideoUrl.deletedCount === 0) {
             return res.status(404).json({ message: 'No Ads data found.' });
         }
