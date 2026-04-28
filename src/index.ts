@@ -889,12 +889,21 @@ app.use(ListingRoutes);
 app.use(AgentsRoutes);
 app.use(CommentsRoutes);
 
-//Health Check Path for Render.com
+// Test endpoint to check if the server is working
+app.get("/api/test", (req, res) => {
+  res.status(200).json({
+    status: "ok",
+    "timestamp": new Date().toISOString(),
+     message: "Test endpoint is working!"
+  });
+});
+
+// Health Check Path for Render.com
 app.get("/healthz", (req, res) => {
     res.json({ status: "ok", message: "Server is running" });
 });
 
-//Server
+// Server
 app.listen(port,  '0.0.0.0',() => {
     console.log(`Server running on http://0.0.0.0:${port}`);
 });
