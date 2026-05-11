@@ -21,6 +21,7 @@ const listingSchema = new mongoose.Schema({
     propertyType: { type: String, required: true },
     lat: { type: Number, required: false },
     lon: { type: Number, required: false },
+    qualityOfRenovation: { type: String, required: false },
 });
 
 const ListingModel = mongoose.model('Listing', listingSchema);

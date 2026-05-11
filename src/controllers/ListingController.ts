@@ -201,7 +201,8 @@ export const handleUpdateListingById  = async (req:any, res:any,) => {
             numberOfStoreysOfBuilding: updatedData.numberOfStoreysOfBuilding, 
             lat: updatedData.lat,                                             
             lon: updatedData.lon,                                             
-            date: Date.now()
+            date: Date.now(),
+            qualityOfRenovation: updatedData.qualityOfRenovation, 
         };     
 
         // Выполняем обновление
