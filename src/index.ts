@@ -903,6 +903,63 @@ app.get("/healthz", (req, res) => {
     res.json({ status: "ok", message: "Server is running" });
 });
 
+app.put('/api/listings/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const updatedData = req.body;
+
+        const existingListing = await ListingModel.findById(id);
+
+        if (!existingListing) {
+            return res.status(404).json({ message: 'Listing not found' });
+        }
+
+        const currentUserId = req.session.user?.id;
+        const currentUserName = req.session.user?.name;
+        const currentUserRole = req.session.user?.role;
+
+        //Проверяем права доступа (владелец объявления должен совпадать с текущим пользователем)
+        if (existingListing.owner !== currentUserName && currentUserRole !== 'admin' && existingListing.ownerId !== currentUserId) {
+            return res.status(403).json({message: `Unauthorized access. You must be the owner (${existingListing.owner}) or an admin to edit this listing.`});
+        }
+
+        const allowedUpdates = {
+            apartmentDetails: updatedData.apartmentDetails,
+            description: updatedData.description,
+            contact: updatedData.contact,
+            price: updatedData.price,
+            location: updatedData.location,
+            image: updatedData.image,
+            propertyType: updatedData.propertyType,
+            typeOfNovelty: updatedData.typeOfNovelty,                         
+            numbersOfRooms: updatedData.numbersOfRooms,                       
+            totalArea: updatedData.totalArea,                                 
+            numberOfFloor: updatedData.numberOfFloor,                         
+            numberOfStoreysOfBuilding: updatedData.numberOfStoreysOfBuilding, 
+            lat: updatedData.lat,                                             
+            lon: updatedData.lon,                                             
+            date: Date.now(),
+            qualityOfRenovation: "supper", // updatedData.qualityOfRenovation
+        };     
+
+        // Выполняем обновление
+        const updatedListing = await ListingModel.findByIdAndUpdate(
+            id,
+            { $set: allowedUpdates },
+            { new: true, runValidators: true }
+        );
+
+         res.json(updatedListing);
+
+    } catch (error) {
+        console.error('Error updating listing:', error);
+        if (error instanceof mongoose.Error.ValidationError) {
+            return res.status(400).json({ error: error.message });
+        }
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
 // Server
 app.listen(port,  '0.0.0.0',() => {
     console.log(`Server running on http://0.0.0.0:${port}`);
