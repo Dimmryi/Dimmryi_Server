@@ -194,8 +194,15 @@ export const handleUpdateListingById  = async (req:any, res:any,) => {
             location: updatedData.location,
             image: updatedData.image,
             propertyType: updatedData.propertyType,
+            typeOfNovelty: updatedData.typeOfNovelty,                         
+            numbersOfRooms: updatedData.numbersOfRooms,                       
+            totalArea: updatedData.totalArea,                                 
+            numberOfFloor: updatedData.numberOfFloor,                         
+            numberOfStoreysOfBuilding: updatedData.numberOfStoreysOfBuilding, 
+            lat: updatedData.lat,                                             
+            lon: updatedData.lon,                                             
             date: Date.now()
-        };
+        };     
 
         // Выполняем обновление
         const updatedListing = await Listing.findByIdAndUpdate(
