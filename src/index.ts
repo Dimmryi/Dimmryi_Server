@@ -835,7 +835,7 @@ app.use(AgentsRoutes);
 app.use(CommentsRoutes);
 
 // Endpoint to Listing update data
-app.put('/api/listings/:id', async (req: any, res:any) => {
+app.put('/api/listing/:id', async (req: any, res:any) => {
     try {
         const { id } = req.params;
         const updatedData = req.body;
