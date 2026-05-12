@@ -180,7 +180,6 @@ export const handleUpdateListingById  = async (req:any, res:any,) => {
         const currentUserName = req.session.user?.name;
         const currentUserRole = req.session.user?.role;
 
-        //Проверяем права доступа (владелец объявления должен совпадать с текущим пользователем)
         if (existingListing.owner !== currentUserName && currentUserRole !== 'admin' && existingListing.ownerId !== currentUserId) {
             return res.status(403).json({message: `Unauthorized access. You must be the owner (${existingListing.owner}) or an admin to edit this listing.`});
         }
@@ -204,7 +203,6 @@ export const handleUpdateListingById  = async (req:any, res:any,) => {
             qualityOfRenovation: updatedData.qualityOfRenovation, 
         };     
 
-        // Выполняем обновление
         const updatedListing = await Listing.findByIdAndUpdate(
             id,
             { $set: allowedUpdates },

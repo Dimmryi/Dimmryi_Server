@@ -12,7 +12,6 @@ import {
     handlePostListings,
     handleUpdateListingById
 } from '../controllers/ListingController';
-import {isAdmin} from "../middlewares/AuthMiddleware";
 
 const router = express.Router();
 
@@ -27,6 +26,6 @@ router.get('/api/listings/ownerId/:userId', handleGetListingsByOwnerId);
 router.get('/api/listings/owner/:userName', handleGetListingsByUserName);
 router.get('/listings', handleGetListings);
 router.post('/listings', handlePostListings);
-// router.put('/api/listings/:id', handleUpdateListingById);
+router.put('/api/listing/:id', handleUpdateListingById);
 
 export default router;
