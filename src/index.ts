@@ -842,6 +842,14 @@ app.get("/api/test", (req, res) => {
   });
 });
 
+// Version Check for Render.com
+app.get("/version", (req, res) => {
+    res.json({
+        version: "2026-05-12-001",
+        commit: process.env.RENDER_GIT_COMMIT
+    });
+});
+
 // Health Check Path for Render.com
 app.get("/healthz", (req, res) => {
     res.json({ status: "ok", message: "Server is running" });
