@@ -155,62 +155,6 @@ mongoose.connect(`${MONGO_DB}`)
         process.exit(1);
     });
 
-// Keys to LiqPay (you need to register to receive them!)
-const PUBLIC_KEY = 'your_public_key';
-const PRIVATE_KEY = 'your_private_key';
-
-// Generating a payment form Google Pay
-app.get('/api/pay', async (req, res) => {
-    const liqpayData = {
-        public_key: PUBLIC_KEY,
-        version: 3,
-        action: 'subscribe', // subscription
-        amount: 100, // price in UAH
-        currency: 'UAH',
-        description: 'Підписка на розсилку сповіщень',
-        subscribe_periodicity: 'month',
-        subscribe_date_start: new Date().toISOString().slice(0, 10),
-        pay_types: 'gpay', // only Google Pay
-        result_url: 'https://your-frontend-site.com/payment-success', // where the user will return
-        server_url: 'https://your-ngrok-url/api/liqpay/callback', // server callback
-    };
-
-    const data = Buffer.from(JSON.stringify(liqpayData)).toString('base64');
-    const signature = crypto
-        .createHash('sha1')
-        .update(PRIVATE_KEY + data + PRIVATE_KEY)
-        .digest('base64');
-
-    res.json({
-        data,
-        signature
-    });
-});
-
-// Callback from LiqPay
-app.post('/api/liqpay/callback', (req, res) => {
-    console.log('Callback data:', req.body);
-
-    // The signature needs to be checked here.
-    const receivedSignature = req.body.signature;
-    const calculatedSignature = crypto
-        .createHash('sha1')
-        .update(PRIVATE_KEY + req.body.data + PRIVATE_KEY)
-        .digest('base64');
-
-    if (receivedSignature === calculatedSignature) {
-        const paymentInfo = JSON.parse(Buffer.from(req.body.data, 'base64').toString('utf8'));
-        console.log('Payment info:', paymentInfo);
-
-        if (paymentInfo.status === 'success') {
-            // Updating the user's subscription status in the database
-            console.log('Subscription paid successfully!');
-        }
-    }
-
-    res.sendStatus(200);
-});
-
 app.post('/api/listingsWithComparison', async (req, res) => {
     try {
         const listingNumber = await getNextListingNumber();
