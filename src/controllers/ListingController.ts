@@ -27,7 +27,6 @@ export const handleDeleteListingByUserId = async (req: any, res: any) => {
     try {
         const { userId } = req.params;
 
-        // Найти и удалить все списки, связанные с пользователем
         const deletedListings = await Listing.deleteMany({ ownerId: userId });
 
         if (deletedListings.deletedCount === 0) {
