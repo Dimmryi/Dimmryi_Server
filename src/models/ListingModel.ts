@@ -4,7 +4,7 @@ const listingSchema = new mongoose.Schema({
     listingNumber: { type: Number, required: false, unique: true },
     typeOfNovelty: { type: String, required: false },
     numbersOfRooms: { type: Number, required: false },
-    totalArea: { type: Number, required: false },
+    totalArea: { type: Number, required: true },
     numberOfFloor: { type: Number, required: false },
     numberOfStoreysOfBuilding: { type: Number, required: false },
     apartmentDetails: { type: String, required: true },

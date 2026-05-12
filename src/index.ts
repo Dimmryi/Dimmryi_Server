@@ -830,7 +830,7 @@ app.post('/api/auth/reset-password', async (req: any, res: any) => {
 });
 
 app.use(UserRoutes);
-//app.use(ListingRoutes);
+app.use(ListingRoutes);
 app.use(AgentsRoutes);
 app.use(CommentsRoutes);
 
