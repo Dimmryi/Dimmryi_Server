@@ -924,22 +924,7 @@ app.put('/api/listings/:id', async (req, res) => {
         }
 
         const allowedUpdates = {
-            apartmentDetails: updatedData.apartmentDetails,
-            description: updatedData.description,
-            contact: updatedData.contact,
-            price: updatedData.price,
-            location: updatedData.location,
-            image: updatedData.image,
-            propertyType: updatedData.propertyType,
-            typeOfNovelty: updatedData.typeOfNovelty,                         
-            numbersOfRooms: updatedData.numbersOfRooms,                       
-            totalArea: updatedData.totalArea,                                 
-            numberOfFloor: updatedData.numberOfFloor,                         
-            numberOfStoreysOfBuilding: updatedData.numberOfStoreysOfBuilding, 
-            lat: updatedData.lat,                                             
-            lon: updatedData.lon,                                             
-            date: Date.now(),
-            qualityOfRenovation: "supper", // updatedData.qualityOfRenovation
+            
         };     
 
         // Выполняем обновление
