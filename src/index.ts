@@ -27,6 +27,7 @@ import haversine from 'haversine-distance';
 import { getNextListingNumber } from './utils/getNextListingNumber';
 import {sendNotificationEmail, sendEmail} from './emailService';
 import { v2 as cloudinary } from 'cloudinary';
+import Listing from "./models/ListingModel";
 dotenv.config();
 
 //We check all the necessary variables *****
@@ -829,9 +830,66 @@ app.post('/api/auth/reset-password', async (req: any, res: any) => {
 });
 
 app.use(UserRoutes);
-app.use(ListingRoutes);
+//app.use(ListingRoutes);
 app.use(AgentsRoutes);
 app.use(CommentsRoutes);
+
+// Endpoint to Listing update data
+app.put('/api/listings/:id', async (req: any, res:any) => {
+    try {
+        const { id } = req.params;
+        const updatedData = req.body;
+
+        const existingListing = await ListingModel.findById(id);
+
+        if (!existingListing) {
+            return res.status(404).json({ message: 'Listing not found' });
+        }
+
+        const currentUserId = req.session.user?.id;
+        const currentUserName = req.session.user?.name;
+        const currentUserRole = req.session.user?.role;
+
+        //Проверяем права доступа (владелец объявления должен совпадать с текущим пользователем)
+        if (existingListing.owner !== currentUserName && currentUserRole !== 'admin' && existingListing.ownerId !== currentUserId) {
+            return res.status(403).json({message: `Unauthorized access. You must be the owner (${existingListing.owner}) or an admin to edit this listing.`});
+        }
+
+        const allowedUpdates = {
+            apartmentDetails: updatedData.apartmentDetails,
+            description: updatedData.description,
+            contact: updatedData.contact,
+            price: updatedData.price,
+            location: updatedData.location,
+            image: updatedData.image,
+            propertyType: updatedData.propertyType,
+            typeOfNovelty: updatedData.typeOfNovelty,
+            numbersOfRooms: updatedData.numbersOfRooms,
+            totalArea: updatedData.totalArea,
+            numberOfFloor: updatedData.numberOfFloor,
+            numberOfStoreysOfBuilding: updatedData.numberOfStoreysOfBuilding,
+            lat: updatedData.lat,
+            lon: updatedData.lon,
+            date: Date.now(),
+            qualityOfRenovation: updatedData.qualityOfRenovation,
+        };
+
+        const updatedListing = await ListingModel.findByIdAndUpdate(
+            id,
+            { $set: allowedUpdates },
+            { new: true, runValidators: true }
+        );
+
+        res.json(updatedListing);
+
+    } catch (error) {
+        console.error('Error updating listing:', error);
+        if (error instanceof mongoose.Error.ValidationError) {
+            return res.status(400).json({ error: error.message });
+        }
+        res.status(500).json({ error: 'Server error' });
+    }
+});
 
 // Test endpoint to check if the server is working
 app.get("/api/test", (req, res) => {
@@ -846,6 +904,7 @@ app.get("/api/test", (req, res) => {
 app.get("/version", (req, res) => {
     res.json({
         version: "2026-05-12-001",
+        "timestamp": new Date().toISOString(),
         commit: process.env.RENDER_GIT_COMMIT
     });
 });
