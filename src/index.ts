@@ -843,16 +843,16 @@ app.use(CommentsRoutes);
 
 // POST /api/chat/init — знайти або створити чат
 app.post('/api/chat/init', async (req: Request, res: Response) => {
-    const { listingId, buyerId, buyerName, sellerId, sellerEmail } = req.body;
+    const { listingId, buyerId, buyerName, sellerId } = req.body;
 
-    if (!listingId || !buyerId || !buyerName || !sellerId || !sellerEmail) {
+    if (!listingId || !buyerId || !buyerName || !sellerId) {
         return res.status(400).json({ error: 'Missing required fields' });
     }
 
     try {
         const chat = await ChatModel.findOneAndUpdate(
             { listingId, buyerId },
-            { $setOnInsert: { listingId, buyerId, buyerName, sellerId, sellerEmail, messages: [] } },
+            { $setOnInsert: { listingId, buyerId, buyerName, sellerId, messages: [] } },
             { new: true, upsert: true }
         );
         res.json(chat);
