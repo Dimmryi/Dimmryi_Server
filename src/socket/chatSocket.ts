@@ -35,32 +35,55 @@ const setupChatSocket = (io: Server) => {
                 // ─────────────────────────────────────────────────
 
                 if (!chat.notified && senderId === chat.buyerId) {
-                    await ChatModel.findByIdAndUpdate(chatId, { notified: true });
-
                     const seller = await User.findById(chat.sellerId);
-                    console.log('[Email] seller found:', seller?.email ?? 'NOT FOUND');
 
                     if (seller?.email) {
-                        try {
-                            await sendNotificationEmail({
-                                to: seller.email,
-                                subject: `Нове повідомлення від ${senderName} — Дім мрії App`,
-                                html: `
-                            <h1>Привіт, ${seller.name}!</h1>
-                            <p>Покупець <b>${senderName}</b> написав вам повідомлення щодо вашого оголошення.</p>
-                            <p><a href="${process.env.FRONTEND_URL}/chat/${chat.listingId}?chatId=${chatId}" style="
-                                display:inline-block;padding:10px 20px;
-                                background:#10b981;color:#fff;
-                                border-radius:8px;text-decoration:none;font-weight:bold;
-                            ">Відкрити чат</a></p>
-                        `,
-                            });
-                            console.log('[Email] sent to:', seller.email);
-                        } catch (emailErr) {
-                            console.error('[Email] FAILED:', emailErr);
-                        }
+                        await sendNotificationEmail({
+                            to: seller.email,
+                            subject: `Нове повідомлення від ${senderName} — Дім мрії App`,
+                            html: `
+                <h1>Привіт, ${seller.name}!</h1>
+                <p>Покупець <b>${senderName}</b> написав вам повідомлення щодо вашого оголошення.</p>
+                <p><a href="${process.env.FRONTEND_URL}/chat/${chat.listingId}?chatId=${chatId}" style="
+                    display:inline-block;padding:10px 20px;
+                    background:#10b981;color:#fff;
+                    border-radius:8px;text-decoration:none;font-weight:bold;
+                ">Відкрити чат</a></p>
+            `,
+                        });
+                        // ставимо true тільки якщо email пройшов
+                        await ChatModel.findByIdAndUpdate(chatId, { notified: true });
                     }
                 }
+
+
+                // if (!chat.notified && senderId === chat.buyerId) {
+                //     await ChatModel.findByIdAndUpdate(chatId, { notified: true });
+                //
+                //     const seller = await User.findById(chat.sellerId);
+                //     console.log('[Email] seller found:', seller?.email ?? 'NOT FOUND');
+                //
+                //     if (seller?.email) {
+                //         try {
+                //             await sendNotificationEmail({
+                //                 to: seller.email,
+                //                 subject: `Нове повідомлення від ${senderName} — Дім мрії App`,
+                //                 html: `
+                //             <h1>Привіт, ${seller.name}!</h1>
+                //             <p>Покупець <b>${senderName}</b> написав вам повідомлення щодо вашого оголошення.</p>
+                //             <p><a href="${process.env.FRONTEND_URL}/chat/${chat.listingId}?chatId=${chatId}" style="
+                //                 display:inline-block;padding:10px 20px;
+                //                 background:#10b981;color:#fff;
+                //                 border-radius:8px;text-decoration:none;font-weight:bold;
+                //             ">Відкрити чат</a></p>
+                //         `,
+                //             });
+                //             console.log('[Email] sent to:', seller.email);
+                //         } catch (emailErr) {
+                //             console.error('[Email] FAILED:', emailErr);
+                //         }
+                //     }
+                // }
             } catch (err) {
                 console.error('[Socket send_message error]', err);
                 socket.emit('chat_error', 'Failed to send message');
