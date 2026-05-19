@@ -23,11 +23,17 @@ import AgentsRoutes from "./routes/AgentsRoutes";
 import AdsModel from "./models/AdsModel";
 import ListingRoutes from "./routes/ListingRoutes";
 import NotificationModel from "./models/NotificationModel";
+import ChatModel from './models/ChatModel';
 import haversine from 'haversine-distance';
 import { getNextListingNumber } from './utils/getNextListingNumber';
 import {sendNotificationEmail, sendEmail} from './emailService';
 import { v2 as cloudinary } from 'cloudinary';
-import Listing from "./models/ListingModel";
+//----------------------------------------------
+import { createServer } from 'http';
+import { Server } from 'socket.io';
+import setupChatSocket from './socket/chatSocket';
+//-----------------------------------------------
+
 dotenv.config();
 
 //We check all the necessary variables *****
@@ -107,11 +113,10 @@ function generateSessionToken(userId: string) {
 }
 
 app.use(cors({
-    //origin: 'http://localhost:5173', // Allowing requests from the front
     origin: ["http://localhost:5173", "http://127.0.0.1:5173"], // Vite dev server
     credentials: true,
     allowedHeaders: ['Content-Type', 'Authorization'],
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
 }));
 
 // Middleware
@@ -834,61 +839,68 @@ app.use(ListingRoutes);
 app.use(AgentsRoutes);
 app.use(CommentsRoutes);
 
-// Endpoint to Listing update data
-// app.put('/api/listing/:id', async (req: any, res:any) => {
-//     try {
-//         const { id } = req.params;
-//         const updatedData = req.body;
-//
-//         const existingListing = await ListingModel.findById(id);
-//
-//         if (!existingListing) {
-//             return res.status(404).json({ message: 'Listing not found' });
-//         }
-//
-//         const currentUserId = req.session.user?.id;
-//         const currentUserName = req.session.user?.name;
-//         const currentUserRole = req.session.user?.role;
-//
-//         if (existingListing.owner !== currentUserName && currentUserRole !== 'admin' && existingListing.ownerId !== currentUserId) {
-//             return res.status(403).json({message: `Unauthorized access. You must be the owner (${existingListing.owner}) or an admin to edit this listing.`});
-//         }
-//
-//         const allowedUpdates = {
-//             apartmentDetails: updatedData.apartmentDetails,
-//             description: updatedData.description,
-//             contact: updatedData.contact,
-//             price: updatedData.price,
-//             location: updatedData.location,
-//             image: updatedData.image,
-//             propertyType: updatedData.propertyType,
-//             typeOfNovelty: updatedData.typeOfNovelty,
-//             numbersOfRooms: updatedData.numbersOfRooms,
-//             totalArea: updatedData.totalArea,
-//             numberOfFloor: updatedData.numberOfFloor,
-//             numberOfStoreysOfBuilding: updatedData.numberOfStoreysOfBuilding,
-//             lat: updatedData.lat,
-//             lon: updatedData.lon,
-//             date: Date.now(),
-//             qualityOfRenovation: updatedData.qualityOfRenovation,
-//         };
-//
-//         const updatedListing = await ListingModel.findByIdAndUpdate(
-//             id,
-//             { $set: allowedUpdates },
-//             { new: true, runValidators: true }
-//         );
-//
-//         res.json(updatedListing);
-//
-//     } catch (error) {
-//         console.error('Error updating listing:', error);
-//         if (error instanceof mongoose.Error.ValidationError) {
-//             return res.status(400).json({ error: error.message });
-//         }
-//         res.status(500).json({ error: 'Server error' });
-//     }
-// });
+//-------------------------------------------------------------------------------------------------------------------
+
+// POST /api/chat/init — знайти або створити чат
+app.post('/api/chat/init', async (req: Request, res: Response) => {
+    const { listingId, buyerId, buyerName, sellerId, sellerEmail } = req.body;
+
+    if (!listingId || !buyerId || !buyerName || !sellerId || !sellerEmail) {
+        return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    try {
+        const chat = await ChatModel.findOneAndUpdate(
+            { listingId, buyerId },
+            { $setOnInsert: { listingId, buyerId, buyerName, sellerId, sellerEmail, messages: [] } },
+            { new: true, upsert: true }
+        );
+        res.json(chat);
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to init chat' });
+    }
+});
+
+// GET /api/chat/:chatId — отримати повідомлення чату
+app.get('/api/chat/:chatId', async (req: Request, res: Response) => {
+    try {
+        const chat = await ChatModel.findById(req.params.chatId);
+        if (!chat) return res.status(404).json({ error: 'Chat not found' });
+        res.json(chat);
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to load chat' });
+    }
+});
+
+// GET /api/chat/listing/:listingId — усі чати по оголошенню (для продавця)
+app.get('/api/chat/listing/:listingId', async (req: Request, res: Response) => {
+    try {
+        const chats = await ChatModel.find(
+            { listingId: req.params.listingId },
+            // повертаємо тільки останнє повідомлення (для превью) + мета-дані
+            { messages: { $slice: -1 }, buyerName: 1, buyerId: 1, updatedAt: 1 }
+        ).sort({ updatedAt: -1 });
+        res.json(chats);
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to load chats' });
+    }
+});
+
+// PATCH /api/chat/:chatId/read — позначити всі непрочитані як прочитані
+app.patch('/api/chat/:chatId/read', async (req: Request, res: Response) => {
+    try {
+        await ChatModel.updateOne(
+            { _id: req.params.chatId },
+            { $set: { 'messages.$[elem].read': true } },
+            { arrayFilters: [{ 'elem.read': false }] }
+        );
+        res.json({ ok: true });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to mark as read' });
+    }
+});
+
+//-------------------------------------------------------------------------------------------------------------------
 
 // Test endpoint to check if the server is working-------------------------------------------------------------------
 app.get("/api/test", (req, res) => {
@@ -914,7 +926,20 @@ app.get("/healthz", (req, res) => {
 });
 //-------------------------------------------------------------------------------------------------------------------
 
-// Server
-app.listen(port,  '0.0.0.0',() => {
-    console.log(`Server running on http://0.0.0.0:${port}`);
+//websocket Server
+const httpServer = createServer(app);
+
+const io = new Server(httpServer, {
+    cors: {
+        origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+        credentials: true,
+    },
 });
+
+setupChatSocket(io);
+
+
+// // Server
+// app.listen(port,  '0.0.0.0',() => {
+//     console.log(`Server running on http://0.0.0.0:${port}`);
+// });
