@@ -924,6 +924,29 @@ app.get("/version", (req, res) => {
 app.get("/healthz", (req, res) => {
     res.json({ status: "ok", message: "Server is running" });
 });
+
+// ТИМЧАСОВО для дебагу — видалити після тесту
+app.get('/api/chat/debug/:chatId', async (req: Request, res: Response) => {
+    try {
+        const chat = await ChatModel.findById(req.params.chatId);
+        if (!chat) return res.json({ error: 'chat not found' });
+
+        const seller = await User.findById(chat.sellerId);
+
+        res.json({
+            chatId: chat._id,
+            notified: chat.notified,
+            buyerId: chat.buyerId,
+            sellerId: chat.sellerId,
+            sellerFoundInDB: !!seller,
+            sellerEmail: seller?.email ?? 'NOT FOUND',
+            messagesCount: chat.messages.length,
+        });
+    } catch (err) {
+        res.status(500).json({ error: String(err) });
+    }
+});
+
 //-------------------------------------------------------------------------------------------------------------------
 
 //websocket Server
