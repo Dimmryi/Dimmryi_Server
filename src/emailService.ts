@@ -2,11 +2,21 @@ import dotenv from "dotenv";
 import {CreateEmailResponse, Resend} from 'resend';
 dotenv.config();
 const nodemailer = require('nodemailer');
-const resend = new Resend(process.env.RESEND_API_KEY);
+
+// Export dependencies for testing purposes
+export let resendClient = new Resend(process.env.RESEND_API_KEY);
+
+export let transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.APP_PASSWORD,
+    },
+});
 
 export const sendNotificationEmail  = async ({ to, subject, html }:{to:any,subject:any,html:any}) => {
     try {
-        const response: CreateEmailResponse = await resend.emails.send({
+        const response: CreateEmailResponse = await resendClient.emails.send({
             from: `noreply@dimmryi.site`,
             //`"My Dream House App" <${process.env.APP_EMAIL}>` || `onboarding@resend.dev`
             to,
@@ -20,14 +30,6 @@ export const sendNotificationEmail  = async ({ to, subject, html }:{to:any,subje
         throw error;
     }
 };
-
-const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.APP_PASSWORD,
-    },
-});
 
 export const sendEmail = async (to:any, subject:any, text:any) => {
     try {
