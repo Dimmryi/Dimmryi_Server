@@ -44,7 +44,8 @@ const app = express();
 app.set('trust proxy', 1);
 
 app.use(cors({
-    origin: process.env.ALLOWED_ORIGINS || 'http://localhost:5173',
+    //origin: process.env.ALLOWED_ORIGINS || 'http://localhost:5173',
+     origin: ["http://localhost:5173", "http://127.0.0.1:5173"], // Vite dev server
     credentials: true,
     allowedHeaders: ['Content-Type', 'Authorization'],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
