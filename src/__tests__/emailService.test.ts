@@ -12,15 +12,8 @@ jest.mock('resend', () => ({
   })),
 }));
 
-// Mock nodemailer
-jest.mock('nodemailer', () => ({
-  createTransport: jest.fn(() => ({
-    sendMail: jest.fn(),
-  })),
-}));
-
 // Import after mocks are set up
-import { sendNotificationEmail, sendEmail, resendClient, transporter } from '../emailService';
+import { sendNotificationEmail, sendEmail, resendClient } from '../emailService';
 
 describe('EmailService', () => {
   beforeEach(() => {
@@ -69,6 +62,20 @@ describe('EmailService', () => {
       expect(resendClient.emails.send).toHaveBeenCalled();
     });
 
+    it('should throw when Resend returns error object', async () => {
+      (resendClient.emails.send as jest.Mock).mockResolvedValue({
+        error: { message: 'domain not verified', name: 'validation_error' },
+      });
+
+      await expect(
+        sendNotificationEmail({
+          to: 'test@example.com',
+          subject: 'Test Subject',
+          html: '<h1>Test Email</h1>',
+        })
+      ).rejects.toThrow('domain not verified');
+    });
+
     it('should send email with correct parameters', async () => {
       (resendClient.emails.send as jest.Mock).mockResolvedValue({ id: 'email_456' });
 
@@ -86,19 +93,20 @@ describe('EmailService', () => {
   });
 
   describe('sendEmail', () => {
-    it('should successfully send email via nodemailer', async () => {
-      (transporter.sendMail as jest.Mock).mockResolvedValue({ response: '250 OK' });
+    it('should successfully send email via Resend', async () => {
+      (resendClient.emails.send as jest.Mock).mockResolvedValue({ id: 'email_789' });
 
       const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
 
       await sendEmail('recipient@example.com', 'Test Subject', 'Test email content');
 
-      expect(transporter.sendMail).toHaveBeenCalledWith({
-        from: '"Real Estate App" <your_email@gmail.com>',
-        to: 'recipient@example.com',
-        subject: 'Test Subject',
-        text: 'Test email content',
-      });
+      expect(resendClient.emails.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          to: 'recipient@example.com',
+          subject: 'Test Subject',
+          html: '<p>Test email content</p>',
+        })
+      );
 
       expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining('Email sent to recipient@example.com')
@@ -107,33 +115,32 @@ describe('EmailService', () => {
       consoleSpy.mockRestore();
     });
 
-    it('should handle errors when sending email via nodemailer', async () => {
-      const mockError = new Error('SMTP connection failed');
-      (transporter.sendMail as jest.Mock).mockRejectedValue(mockError);
+    it('should handle errors when sending email', async () => {
+      const mockError = new Error('Resend connection failed');
+      (resendClient.emails.send as jest.Mock).mockRejectedValue(mockError);
 
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+      jest.spyOn(console, 'log').mockImplementation();
 
-      await sendEmail('recipient@example.com', 'Test Subject', 'Test content');
+      await expect(
+        sendEmail('recipient@example.com', 'Test Subject', 'Test content')
+      ).rejects.toThrow('Resend connection failed');
 
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        'Failed to send email:',
-        mockError
-      );
+      expect(consoleErrorSpy).toHaveBeenCalled();
 
       consoleErrorSpy.mockRestore();
     });
 
-    it('should call transporter.sendMail with correct parameters', async () => {
-      (transporter.sendMail as jest.Mock).mockResolvedValue({});
-
+    it('should call resendClient.emails.send with correct parameters', async () => {
+      (resendClient.emails.send as jest.Mock).mockResolvedValue({});
       jest.spyOn(console, 'log').mockImplementation();
 
       await sendEmail('admin@test.com', 'Notification', 'Important message');
 
-      const callArgs = (transporter.sendMail as jest.Mock).mock.calls[0][0];
+      const callArgs = (resendClient.emails.send as jest.Mock).mock.calls[0][0];
       expect(callArgs.to).toBe('admin@test.com');
       expect(callArgs.subject).toBe('Notification');
-      expect(callArgs.text).toBe('Important message');
+      expect(callArgs.html).toBe('<p>Important message</p>');
 
       jest.restoreAllMocks();
     });
@@ -142,7 +149,6 @@ describe('EmailService', () => {
   describe('Integration scenarios', () => {
     it('should handle multiple emails in sequence', async () => {
       (resendClient.emails.send as jest.Mock).mockResolvedValue({ id: 'email_1' });
-      (transporter.sendMail as jest.Mock).mockResolvedValue({});
       jest.spyOn(console, 'log').mockImplementation();
 
       const email1 = sendNotificationEmail({
@@ -153,17 +159,18 @@ describe('EmailService', () => {
 
       const email2 = sendEmail('user2@example.com', 'Email 2', 'Content 2');
 
-      const results = await Promise.all([email1, email2]);
+      await Promise.all([email1, email2]);
 
-      expect(resendClient.emails.send).toHaveBeenCalled();
-      expect(transporter.sendMail).toHaveBeenCalled();
+      expect(resendClient.emails.send).toHaveBeenCalledTimes(2);
 
       jest.restoreAllMocks();
     });
 
     it('should handle partial failures gracefully', async () => {
-      (resendClient.emails.send as jest.Mock).mockRejectedValue(new Error('Resend failed'));
-      (transporter.sendMail as jest.Mock).mockResolvedValue({});
+      (resendClient.emails.send as jest.Mock)
+        .mockRejectedValueOnce(new Error('Resend failed'))
+        .mockResolvedValueOnce({ id: 'email_ok' });
+
       jest.spyOn(console, 'log').mockImplementation();
       jest.spyOn(console, 'error').mockImplementation();
 
@@ -173,15 +180,12 @@ describe('EmailService', () => {
         html: '<p>Test</p>',
       }).catch(e => e);
 
-      const nodemailerPromise = sendEmail('user@example.com', 'Test', 'Test');
+      const secondPromise = sendEmail('user@example.com', 'Test', 'Test');
 
-      const [resendResult, nodemailerResult] = await Promise.all([
-        resendPromise,
-        nodemailerPromise,
-      ]);
+      const [resendResult] = await Promise.all([resendPromise, secondPromise]);
 
       expect(resendResult).toBeInstanceOf(Error);
-      expect(transporter.sendMail).toHaveBeenCalled();
+      expect(resendClient.emails.send).toHaveBeenCalledTimes(2);
 
       jest.restoreAllMocks();
     });
