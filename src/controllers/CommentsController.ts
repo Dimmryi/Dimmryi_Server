@@ -1,102 +1,75 @@
-import mongoose from "mongoose";
-import CommentModel from "../models/CommentModel";
+import { Request, Response } from 'express';
+import mongoose from 'mongoose';
+import CommentModel from '../models/CommentModel';
 
-export const handleDeleteCommentById = async (req:any, res:any) => {
+export const handleDeleteCommentById = async (req: any, res: any) => {
     try {
         const { commentId } = req.params;
-        // Проверка на валидность ObjectId
         if (!mongoose.Types.ObjectId.isValid(commentId)) {
             return res.status(400).json({ message: `Invalid ID format: ${commentId}` });
         }
 
-        const objectId = new mongoose.Types.ObjectId(commentId);
+        const deleted = await CommentModel.deleteMany({ _id: new mongoose.Types.ObjectId(commentId) });
 
-        //Найти и удалить все списки, связанные с пользователем
-        const deletedComment = await CommentModel.deleteMany({ _id: objectId });
-
-        if (deletedComment.deletedCount === 0) {
-            return res.status(404).json({ message: 'No Comment data found.' });
+        if (deleted.deletedCount === 0) {
+            return res.status(404).json({ message: 'Comment not found.' });
         }
 
-        res.status(200).json({
-            message: `Successfully deleted comment.`,
-            deletedCount: deletedComment.deletedCount,
-        });
-
+        res.status(200).json({ message: 'Comment deleted.', deletedCount: deleted.deletedCount });
     } catch (error) {
         res.status(500).json({ error: 'Server error' });
     }
 };
 
-export const handleDeleteCommentsByAuthorId = async (req:any, res:any) => {
+export const handleDeleteCommentsByAuthorId = async (req: any, res: any) => {
     try {
         const { authorId } = req.params;
+        const deleted = await CommentModel.deleteMany({ authorId });
 
-        // if (req.session.user?.id !== authorId && req.session.user?.role !== 'admin') {
-        //     return res.status(403).json({ error: 'Forbidden' });
-        // }
-
-        const deletedComments = await CommentModel.deleteMany({ authorId: authorId });
-        if (deletedComments.deletedCount === 0) {
-            return res.status(404).json({ message: 'No Comment data found.' });
+        if (deleted.deletedCount === 0) {
+            return res.status(404).json({ message: 'No comments found for this author.' });
         }
 
-        res.status(200).json({
-            message: `Successfully deleted comment.`,
-            deletedCount: deletedComments.deletedCount,
-        });
-
+        res.status(200).json({ message: 'Comments deleted.', deletedCount: deleted.deletedCount });
     } catch (error) {
         res.status(500).json({ error: 'Server error' });
     }
 };
 
-export const handleDeleteCommentByListingId = async (req:any, res:any) => {
+export const handleDeleteCommentByListingId = async (req: any, res: any) => {
     try {
-        //Найти и удалить все списки, связанные с пользователем
-        const deletedComment = await CommentModel.deleteMany({ listingId: req.params.listingId });
+        const deleted = await CommentModel.deleteMany({ listingId: req.params.listingId });
 
-        if (deletedComment.deletedCount === 0) {
-            return res.status(404).json({ message: 'No Comment data found.' });
+        if (deleted.deletedCount === 0) {
+            return res.status(404).json({ message: 'No comments found for this listing.' });
         }
 
-        res.status(200).json({
-            message: `Successfully deleted comment.`,
-            deletedCount: deletedComment.deletedCount,
-        });
+        res.status(200).json({ message: 'Comments deleted.', deletedCount: deleted.deletedCount });
     } catch (error) {
         res.status(500).json({ error: 'Server error' });
     }
 };
 
-export const handleGetCommentsByAuthorId = async (req:any, res:any) => {
+export const handleGetCommentsByAuthorId = async (req: any, res: any) => {
     try {
-        const comment = await CommentModel.find({ authorId: req.params.userId });
-        if (!comment) {
-            res.status(404).json({ message: 'Comment not found' });
-            return
-        }
-        res.json(comment);
+        const comments = await CommentModel.find({ authorId: req.params.userId });
+        res.json(comments);
     } catch (error) {
         res.status(500).json({ error: 'Server error' });
     }
 };
 
-export const handleGetCommentsByListingId = async (req:any, res:any) => {
+export const handleGetCommentsByListingId = async (req: any, res: any) => {
     try {
-        const comment = await CommentModel.find({ listingId: req.params.id });
-        if (!comment) {
-            res.status(404).json({ message: 'Comment not found' });
-            return
-        }
-        res.json(comment);
+        const comments = await CommentModel.find({ listingId: req.params.id });
+        res.json(comments);
     } catch (error) {
         res.status(500).json({ error: 'Server error' });
     }
 };
 
-export const handleGetComments = async (req:any, res:any) => {
-    try{
+export const handleGetComments = async (req: Request, res: Response) => {
+    try {
         const comments = await CommentModel.find();
         res.json(comments);
     } catch (error) {
@@ -104,49 +77,41 @@ export const handleGetComments = async (req:any, res:any) => {
     }
 };
 
-export const handlePostComments = async (req:any, res:any) => {
+export const handlePostComments = async (req: any, res: any) => {
     try {
-        const {listingId, commentsAuthor, authorId, timePublication, comment, rating} = req.body;
-        const newComment = new CommentModel({
-            listingId,
-            commentsAuthor,
-            authorId,
-            timePublication,
-            comment,
-            rating,
-        });
+        const { listingId, commentsAuthor, authorId, timePublication, comment, rating } = req.body;
+        const newComment = new CommentModel({ listingId, commentsAuthor, authorId, timePublication, comment, rating });
         await newComment.save();
-
-        res.status(201).json({ message: `Comment saved successfully!`});
-    }catch (error) {
-        res.status(500).json({ error: 'Error saved comment.' });
+        res.status(201).json({ message: 'Comment saved successfully!' });
+    } catch (error) {
+        res.status(500).json({ error: 'Server error' });
     }
 };
 
-export const handleUpdateCommentById = async (req:any, res:any) => {
+export const handleUpdateCommentById = async (req: any, res: any) => {
     try {
         const { id } = req.params;
-        const { comment, rating, authorId } = req.body;
+        const { comment, rating } = req.body;
 
         if (!comment) {
-            return res.status(400).json({ error: "Comment and rating are required" });
+            return res.status(400).json({ error: 'Comment text is required.' });
         }
 
         const existingComment = await CommentModel.findById(id);
         const currentUserId = req.session.user?.id;
 
         if (req.session.user?.role !== 'admin' && currentUserId !== existingComment?.authorId) {
-            return res.status(403).json({ message: `Unauthorized : ${req.session.user?.role}` });
+            return res.status(403).json({ message: 'Unauthorized.' });
         }
 
-        const updatedComment = await CommentModel.findByIdAndUpdate(
+        const updated = await CommentModel.findByIdAndUpdate(
             id,
-            { comment, rating: rating || "", timePublication: Date.now() },
+            { comment, rating: rating || '', timePublication: Date.now() },
             { new: true }
         );
 
-        res.json(updatedComment);
-    } catch (error:any) {
+        res.json(updated);
+    } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
 };

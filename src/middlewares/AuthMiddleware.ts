@@ -1,11 +1,11 @@
-import { Request, Response, NextFunction } from "express";
-import User from "../models/UserModel";
+import { Request, Response, NextFunction } from 'express';
+import User from '../models/UserModel';
 
 export const isAdmin = (req: any, res: Response, next: NextFunction) => {
     if (req.user && req.user.role === 'admin') {
         next();
     } else {
-        res.status(403).json({ message: "Access denied. Admins only." });
+        res.status(403).json({ message: 'Access denied. Admins only.' });
     }
 };
 
@@ -13,7 +13,7 @@ export const requireAuth = async (req: any, res: Response, next: NextFunction) =
     const userId = req.session?.user?.id;
 
     if (!userId) {
-        return res.status(401).json({ message: 'Вы не авторизованы' });
+        return res.status(401).json({ message: 'Not authenticated.' });
     }
 
     try {
@@ -21,20 +21,20 @@ export const requireAuth = async (req: any, res: Response, next: NextFunction) =
 
         if (!user) {
             req.session.destroy(() => {});
-            return res.status(401).json({ message: 'Сессия недействительна. Пользователь не найден.' });
+            return res.status(401).json({ message: 'Session invalid. User not found.' });
         }
 
-        req.user = user; // для удобного доступа в других обработчиках
+        req.user = user;
         next();
     } catch (err) {
         console.error('Auth middleware error:', err);
-        res.status(500).json({ message: 'Ошибка авторизации' });
+        res.status(500).json({ message: 'Authentication error.' });
     }
 };
 
 export const checkAuth = async (req: any, res: any, next: NextFunction) => {
     if (!req.session.user) {
-        return res.status(401).json({ message: "Not authenticated" });
+        return res.status(401).json({ message: 'Not authenticated.' });
     }
     next();
 };

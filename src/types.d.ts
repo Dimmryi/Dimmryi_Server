@@ -6,14 +6,10 @@ declare module 'express-session' {
             id: string;
             name: string;
             email: string;
-            preferredContact: string;
-            contact: string;
+            preferredContact?: string;
+            contact?: string;
+            role?: string;
+            authMethod?: string;
         };
-    }
-}
-
-declare module 'express-request' {
-    interface Request {
-        session: session.Session & Partial<session.SessionData>;
     }
 }

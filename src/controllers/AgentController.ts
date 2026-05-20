@@ -1,30 +1,27 @@
-import mongoose from "mongoose";
-import AgentModel from "../models/AgentModel";
+import { Request, Response } from 'express';
+import mongoose from 'mongoose';
+import AgentModel from '../models/AgentModel';
 
-export const handleDeleteAgentById =  async (req:any, res:any) => {
+export const handleDeleteAgentById = async (req: any, res: any) => {
     try {
         const { agentId } = req.params;
         if (!mongoose.Types.ObjectId.isValid(agentId)) {
             return res.status(400).json({ message: `Invalid ID format: ${agentId}` });
         }
 
-        const objectId = new mongoose.Types.ObjectId(agentId);
-        const deletedAgent = await AgentModel.deleteMany({ _id: objectId });
+        const deleted = await AgentModel.deleteMany({ _id: new mongoose.Types.ObjectId(agentId) });
 
-        if (deletedAgent.deletedCount === 0) {
-            return res.status(404).json({ message: 'No Agent data found.' });
+        if (deleted.deletedCount === 0) {
+            return res.status(404).json({ message: 'Agent not found.' });
         }
-        res.status(200).json({
-            message: `Successfully deleted agent data.`,
-            deletedCount: deletedAgent.deletedCount,
-        });
 
+        res.status(200).json({ message: 'Agent deleted.', deletedCount: deleted.deletedCount });
     } catch (error) {
         res.status(500).json({ error: 'Server error' });
     }
 };
 
-export const handleGetAgents = async (req:any, res:any) => {
+export const handleGetAgents = async (req: Request, res: Response) => {
     try {
         const agents = await AgentModel.find();
         res.json(agents);
@@ -33,12 +30,12 @@ export const handleGetAgents = async (req:any, res:any) => {
     }
 };
 
-export const handleGetAgentsById = async (req:any, res:any) => {
+export const handleGetAgentsById = async (req: any, res: any) => {
     try {
         const agent = await AgentModel.find({ _id: req.params.id });
         if (!agent) {
-            res.status(404).json({ message: `Agent's data not found` });
-            return
+            res.status(404).json({ message: 'Agent not found.' });
+            return;
         }
         res.json(agent);
     } catch (error) {
@@ -46,44 +43,41 @@ export const handleGetAgentsById = async (req:any, res:any) => {
     }
 };
 
-export const handlePostAgents = async (req:any, res:any) => {
+export const handlePostAgents = async (req: any, res: any) => {
     try {
         const { image, ...rest } = req.body;
         const agent = new AgentModel({
-            image: Array.isArray(image) ? image : [image], // Поддержка массива
-            ...rest
+            image: Array.isArray(image) ? image : [image],
+            ...rest,
         });
         await agent.save();
-        res.json({ message: 'Agent added successful!' });
+        res.json({ message: 'Agent added successfully!' });
     } catch (error) {
         res.status(500).json({ error: 'Server error' });
     }
 };
 
-export const handleUpdateAgentsData = async (req:any, res:any) => {
+export const handleUpdateAgentsData = async (req: any, res: any) => {
     try {
         const { id } = req.params;
         const { name, rating, email, jobTitle, saleVolume, license, totalDeal, phone, image } = req.body;
 
         if (!name || !rating || !email || !jobTitle || !saleVolume || !license || !totalDeal || !phone || !image) {
-            return res.status(400).json({ error: "Fill in all required data" });
+            return res.status(400).json({ error: 'All fields are required.' });
         }
-
-        const existingAgent = await AgentModel.findById(id);
-        const currentUserId = req.session.user?.id;
 
         if (req.session.user?.role !== 'admin') {
-            return res.status(403).json({ message: "Administrator access rights are required" });
+            return res.status(403).json({ message: 'Administrator access required.' });
         }
 
-        const updatedAgent = await AgentModel.findByIdAndUpdate(
+        const updated = await AgentModel.findByIdAndUpdate(
             id,
             { name, rating, email, jobTitle, saleVolume, license, totalDeal, phone, image, date: Date.now() },
             { new: true }
         );
 
-        res.json(updatedAgent);
-    } catch (error:any) {
+        res.json(updated);
+    } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
 };

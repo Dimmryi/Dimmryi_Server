@@ -1,104 +1,34 @@
+import { Request, Response } from 'express';
+import mongoose from 'mongoose';
+import haversine from 'haversine-distance';
 import Listing from '../models/ListingModel';
-import mongoose from "mongoose";
+import NotificationModel from '../models/NotificationModel';
+import { getNextListingNumber } from '../utils/getNextListingNumber';
+import { sendNotificationEmail } from '../emailService';
 
-export const handleDeleteLastListing = async (req:any, res:any) => {
+export const handleGetListings = async (req: any, res: Response) => {
     try {
-        // Найти последний добавленный элемент
-        const lastListing = await Listing.findOne().sort({ _id: -1 });
+        const page = Math.max(1, parseInt(req.query.page as string) || 1);
+        const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 20));
+        const skip = (page - 1) * limit;
 
-        if (!lastListing) {
-            return res.status(404).json({ message: 'No listings found to delete.' });
-        }
+        const [listings, total] = await Promise.all([
+            Listing.find().skip(skip).limit(limit).lean(),
+            Listing.countDocuments(),
+        ]);
 
-        // Удалить найденный элемент
-        await Listing.findByIdAndDelete(lastListing._id);
-
-        res.status(200).json({
-            message: 'Successfully deleted the last listing.',
-            deletedListing: lastListing,
-        });
+        res.json({ listings, total, page, limit, totalPages: Math.ceil(total / limit) });
     } catch (error) {
-        console.error('Error deleting the last listing:', error);
-        res.status(500).json({ message: 'Failed to delete the last listing.' });
+        res.status(500).json({ error: 'Server error' });
     }
 };
 
-export const handleDeleteListingByUserId = async (req: any, res: any) => {
+export const handleGetListingsById = async (req: any, res: any) => {
     try {
-        const { userId } = req.params;
-
-        const deletedListings = await Listing.deleteMany({ ownerId: userId });
-
-        if (deletedListings.deletedCount === 0) {
-            return res.status(404).json({ message: 'No listings found for the user.' });
-        }
-
-        res.status(200).json({
-            message: 'Successfully deleted listings for the user.',
-            deletedCount: deletedListings.deletedCount,
-        });
-    } catch (error) {
-        console.error('Error deleting listings by user ID:', error);
-        res.status(500).json({ message: 'Failed to delete listings by user ID.' });
-    }
-};
-
-export const handleDeleteListingByUserName = async (req: any, res: any) => {
-    try {
-        const { userName } = req.params;
-
-        //Найти и удалить все списки, связанные с пользователем
-        const deletedListings = await Listing.deleteMany({ owner: userName });
-
-        if (deletedListings.deletedCount === 0) {
-            return res.status(404).json({ message: 'No listings found for the user.' });
-        }
-
-        res.status(200).json({
-            message: 'Successfully deleted listings for the user.',
-            deletedCount: deletedListings.deletedCount,
-        });
-    } catch (error) {
-        console.error('Error deleting listings by user ID:', error);
-        res.status(500).json({ message: 'Failed to delete listings by user ID.' });
-    }
-};
-
-export const handleDeleteListingById = async (req: any, res: any) => {
-    try {
-        const { id } = req.params;
-
-        // Проверка на валидность ObjectId
-        if (!mongoose.Types.ObjectId.isValid(id)) {
-            return res.status(400).json({ message: `Invalid ID format: ${id}` });
-        }
-
-        const objectId = new mongoose.Types.ObjectId(id);
-
-        // Удаляем документ по _id
-        const deletedListings = await Listing.deleteMany({ _id: objectId });
-
-        if (deletedListings.deletedCount === 0) {
-            return res.status(404).json({ message: 'No listings found by ID.' });
-        }
-
-        res.status(200).json({
-            message: 'Successfully deleted listing by ID.',
-            deletedCount: deletedListings.deletedCount,
-        });
-    } catch (error) {
-        console.error('Error deleting listings by ID:', error);
-        res.status(500).json({ message: 'Failed to delete listings by ID.' });
-    }
-};
-
-export const handleGetListingsById = async (req:any, res:any) => {
-    try {
-        //const listing = await Listing.findById(req.params.id);
         const listing = await Listing.find({ _id: req.params.id });
         if (!listing) {
             res.status(404).json({ message: 'Listing not found' });
-            return
+            return;
         }
         res.json(listing);
     } catch (error) {
@@ -106,13 +36,12 @@ export const handleGetListingsById = async (req:any, res:any) => {
     }
 };
 
-export const handleGetListingById = async (req:any, res:any) => {
+export const handleGetListingById = async (req: any, res: any) => {
     try {
         const listing = await Listing.findById(req.params.id);
-        //const listing = await Listing.find({ _id: req.params.id });
         if (!listing) {
             res.status(404).json({ message: 'Listing not found' });
-            return
+            return;
         }
         res.json(listing);
     } catch (error) {
@@ -120,12 +49,12 @@ export const handleGetListingById = async (req:any, res:any) => {
     }
 };
 
-export const handleGetListingsByOwnerId = async (req:any, res:any,) => {
+export const handleGetListingsByOwnerId = async (req: any, res: any) => {
     try {
         const listing = await Listing.find({ ownerId: req.params.userId });
         if (!listing) {
             res.status(404).json({ message: 'Listing not found' });
-            return
+            return;
         }
         res.json(listing);
     } catch (error) {
@@ -133,7 +62,7 @@ export const handleGetListingsByOwnerId = async (req:any, res:any,) => {
     }
 };
 
-export const handleGetListingsByUserName = async (req:any, res:any,) => {
+export const handleGetListingsByUserName = async (req: any, res: any) => {
     try {
         const listings = await Listing.find({ owner: req.params.userName });
         res.json(listings);
@@ -142,34 +71,76 @@ export const handleGetListingsByUserName = async (req:any, res:any,) => {
     }
 };
 
-export const handleGetListings = async (req:any, res:any,) => {
-    try {
-        const listings = await Listing.find();
-        res.json(listings);
-    } catch (error) {
-        res.status(500).json({ error: 'Server error' });
-    }
-};
-
-export const handlePostListings = async (req:any, res:any,) => {
+export const handlePostListings = async (req: any, res: any) => {
     try {
         const { image, ...rest } = req.body;
-            const listing = new Listing({
-                image: Array.isArray(image) ? image : [image], // Поддержка массива
-                ...rest
-            });
-            await listing.save();
-            res.json({ message: 'Listing added with multiple images!' });
+        const listing = new Listing({
+            image: Array.isArray(image) ? image : [image],
+            ...rest,
+        });
+        await listing.save();
+        res.json({ message: 'Listing added with multiple images!' });
     } catch (error) {
         res.status(500).json({ error: 'Server error' });
     }
 };
 
-export const handleUpdateListingById  = async (req:any, res:any,) => {
-        try {
+export const handlePostListingsWithComparison = async (req: Request, res: Response) => {
+    try {
+        const listingNumber = await getNextListingNumber();
+        const newListing = new Listing({ ...req.body, listingNumber, date: Date.now() });
+        await newListing.save();
+
+        const notifications = await NotificationModel.find({
+            listingType: newListing.listingType,
+            propertyType: newListing.propertyType,
+            typeOfNovelty: newListing.typeOfNovelty,
+            minPrice: { $lte: newListing.price },
+            maxPrice: { $gte: newListing.price },
+            minNumbersOfRoom: { $lte: newListing.numbersOfRooms },
+            maxNumbersOfRoom: { $gte: newListing.numbersOfRooms },
+            minTotalArea: { $lte: newListing.totalArea },
+            maxTotalArea: { $gte: newListing.totalArea },
+            minFloor: { $lte: newListing.numberOfFloor },
+            maxFloor: { $gte: newListing.numberOfFloor },
+        });
+
+        const listingCoords = { lat: newListing.lat || 50, lon: newListing.lon || 36 };
+
+        const matchedNotifications = notifications.filter((n) => {
+            const distance = haversine(listingCoords, { lat: n.lat || 50, lon: n.lon || 36 });
+            return distance <= n.locationRange * 1000;
+        });
+
+        for (const match of matchedNotifications) {
+            const distance = Math.round(haversine(listingCoords, { lat: match.lat || 50, lon: match.lon || 36 }));
+            await sendNotificationEmail({
+                to: match.email,
+                subject: 'Нове оголошення відповідає вашим параметрам пошуку',
+                html: `<h2>З'явилося нове оголошення, що відповідає вашим перевагам:</h2>
+                <p>Ціна: ${newListing.price}</p></br>
+                <p>Тип оголошення: ${newListing.listingType}</p></br>
+                <p>Кількість кімнат: ${newListing.numbersOfRooms}</p></br>
+                <p>Загальна площа: ${newListing.totalArea} м²</p></br>
+                <p>Поверх: ${newListing.numberOfFloor}</p></br>
+                <p>Відстань до бажаної точки: ${distance} метрів</p></br>
+                <p>Переглянути на сайті:</p>
+                <b>${process.env.ALLOWED_ORIGINS}/details/${newListing.id}</b>
+                <p>З повагою, команда Дім мрії App.</p>`,
+            });
+        }
+
+        res.status(201).json({ message: 'Listing created and notifications sent.' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Server error' });
+    }
+};
+
+export const handleUpdateListingById = async (req: any, res: any) => {
+    try {
         const { id } = req.params;
         const updatedData = req.body;
-
         const existingListing = await Listing.findById(id);
 
         if (!existingListing) {
@@ -181,7 +152,7 @@ export const handleUpdateListingById  = async (req:any, res:any,) => {
         const currentUserRole = req.session.user?.role;
 
         if (existingListing.owner !== currentUserName && currentUserRole !== 'admin' && existingListing.ownerId !== currentUserId) {
-            return res.status(403).json({message: `Unauthorized access. You must be the owner (${existingListing.owner}) or an admin to edit this listing.`});
+            return res.status(403).json({ message: `Unauthorized. You must be the owner or an admin.` });
         }
 
         const allowedUpdates = {
@@ -192,16 +163,16 @@ export const handleUpdateListingById  = async (req:any, res:any,) => {
             location: updatedData.location,
             image: updatedData.image,
             propertyType: updatedData.propertyType,
-            typeOfNovelty: updatedData.typeOfNovelty,                         
-            numbersOfRooms: updatedData.numbersOfRooms,                       
-            totalArea: updatedData.totalArea,                                 
-            numberOfFloor: updatedData.numberOfFloor,                         
-            numberOfStoreysOfBuilding: updatedData.numberOfStoreysOfBuilding, 
-            lat: updatedData.lat,                                             
-            lon: updatedData.lon,                                             
+            typeOfNovelty: updatedData.typeOfNovelty,
+            numbersOfRooms: updatedData.numbersOfRooms,
+            totalArea: updatedData.totalArea,
+            numberOfFloor: updatedData.numberOfFloor,
+            numberOfStoreysOfBuilding: updatedData.numberOfStoreysOfBuilding,
+            lat: updatedData.lat,
+            lon: updatedData.lon,
             date: Date.now(),
-            qualityOfRenovation: updatedData.qualityOfRenovation, 
-        };     
+            qualityOfRenovation: updatedData.qualityOfRenovation,
+        };
 
         const updatedListing = await Listing.findByIdAndUpdate(
             id,
@@ -209,13 +180,81 @@ export const handleUpdateListingById  = async (req:any, res:any,) => {
             { new: true, runValidators: true }
         );
 
-         res.json(updatedListing);
-
+        res.json(updatedListing);
     } catch (error) {
         console.error('Error updating listing:', error);
         if (error instanceof mongoose.Error.ValidationError) {
             return res.status(400).json({ error: error.message });
         }
         res.status(500).json({ error: 'Server error' });
+    }
+};
+
+export const handleDeleteListingById = async (req: any, res: any) => {
+    try {
+        const { id } = req.params;
+
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            return res.status(400).json({ message: `Invalid ID format: ${id}` });
+        }
+
+        const deleted = await Listing.deleteMany({ _id: new mongoose.Types.ObjectId(id) });
+
+        if (deleted.deletedCount === 0) {
+            return res.status(404).json({ message: 'No listings found by ID.' });
+        }
+
+        res.status(200).json({ message: 'Listing deleted.', deletedCount: deleted.deletedCount });
+    } catch (error) {
+        console.error('Error deleting listing:', error);
+        res.status(500).json({ message: 'Failed to delete listing.' });
+    }
+};
+
+export const handleDeleteListingByUserId = async (req: any, res: any) => {
+    try {
+        const { userId } = req.params;
+        const deleted = await Listing.deleteMany({ ownerId: userId });
+
+        if (deleted.deletedCount === 0) {
+            return res.status(404).json({ message: 'No listings found for this user.' });
+        }
+
+        res.status(200).json({ message: 'Listings deleted.', deletedCount: deleted.deletedCount });
+    } catch (error) {
+        console.error('Error deleting listings by user ID:', error);
+        res.status(500).json({ message: 'Failed to delete listings.' });
+    }
+};
+
+export const handleDeleteListingByUserName = async (req: any, res: any) => {
+    try {
+        const { userName } = req.params;
+        const deleted = await Listing.deleteMany({ owner: userName });
+
+        if (deleted.deletedCount === 0) {
+            return res.status(404).json({ message: 'No listings found for this user.' });
+        }
+
+        res.status(200).json({ message: 'Listings deleted.', deletedCount: deleted.deletedCount });
+    } catch (error) {
+        console.error('Error deleting listings by username:', error);
+        res.status(500).json({ message: 'Failed to delete listings.' });
+    }
+};
+
+export const handleDeleteLastListing = async (req: any, res: any) => {
+    try {
+        const lastListing = await Listing.findOne().sort({ _id: -1 });
+
+        if (!lastListing) {
+            return res.status(404).json({ message: 'No listings found.' });
+        }
+
+        await Listing.findByIdAndDelete(lastListing._id);
+        res.status(200).json({ message: 'Last listing deleted.', deletedListing: lastListing });
+    } catch (error) {
+        console.error('Error deleting last listing:', error);
+        res.status(500).json({ message: 'Failed to delete last listing.' });
     }
 };
