@@ -23,7 +23,7 @@ export const sendNotificationEmail  = async ({ to, subject, html }:{to:any,subje
             subject,
         });
 
-        const response: CreateEmailResponse = await resendClient.emails.send({
+        const response: any = await resendClient.emails.send({
             from: fromEmail,
             to,
             subject,
@@ -31,6 +31,38 @@ export const sendNotificationEmail  = async ({ to, subject, html }:{to:any,subje
         });
 
         console.log('[Email debug] resend response:', response);
+
+        // Resend may return an object with `error` instead of throwing.
+        if (response && response.error) {
+            const err = response.error;
+            console.error('[Email error] Resend returned error object:', err);
+
+            // If domain is not verified in Resend, fallback to SMTP (nodemailer)
+            if (err.name === 'validation_error' && /domain/i.test(err.message || '')) {
+                console.log('[Email debug] Falling back to SMTP because Resend domain not verified');
+                try {
+                    const mailOptions = {
+                        from: `${process.env.APP_EMAIL || process.env.EMAIL_USER}`,
+                        to,
+                        subject,
+                        html,
+                    };
+                    const smtpResult = await transporter.sendMail(mailOptions);
+                    console.log('[Email debug] SMTP fallback result:', smtpResult);
+                    return { provider: 'smtp', result: smtpResult };
+                } catch (smtpErr) {
+                    console.error('[Email error] SMTP fallback failed:', smtpErr);
+                    throw smtpErr;
+                }
+            }
+
+            // For other resend errors, throw to let caller handle it
+            const e = new Error(err.message || 'Resend error');
+            // attach original for debugging
+            (e as any).original = err;
+            throw e;
+        }
+
         return response;
     } catch (error) {
         console.error('[Email error] sendNotificationEmail failed:', error);
