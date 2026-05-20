@@ -15,32 +15,47 @@ export let transporter = nodemailer.createTransport({
 });
 
 export const sendNotificationEmail  = async ({ to, subject, html }:{to:any,subject:any,html:any}) => {
+    const fromEmail = process.env.APP_EMAIL || process.env.EMAIL_USER || 'noreply@dimmryi.site';
     try {
+        console.log('[Email debug] sendNotificationEmail', {
+            from: fromEmail,
+            to,
+            subject,
+        });
+
         const response: CreateEmailResponse = await resendClient.emails.send({
-            from: `noreply@dimmryi.site`,
-            //`"My Dream House App" <${process.env.APP_EMAIL}>` || `onboarding@resend.dev`
+            from: fromEmail,
             to,
             subject,
             html,
         });
 
+        console.log('[Email debug] resend response:', response);
         return response;
     } catch (error) {
-        console.error('Email error:', error);
+        console.error('[Email error] sendNotificationEmail failed:', error);
         throw error;
     }
 };
 
 export const sendEmail = async (to:any, subject:any, text:any) => {
+    const fromEmail = process.env.EMAIL_USER || 'no-reply@example.com';
     try {
+        console.log('[Email debug] sendEmail', {
+            from: fromEmail,
+            to,
+            subject,
+        });
+
         await transporter.sendMail({
-            from: '"Real Estate App" <your_email@gmail.com>',
+            from: `"Real Estate App" <${fromEmail}>`,
             to,
             subject,
             text,
         });
         console.log(`Email sent to ${to}`);
     } catch (error) {
-        console.error('Failed to send email:', error);
+        console.error('[Email error] sendEmail failed:', error);
+        throw error;
     }
 };

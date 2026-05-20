@@ -36,12 +36,23 @@ const setupChatSocket = (io: Server) => {
 
                 if (!chat.notified && senderId === chat.buyerId) {
                     const seller = await User.findById(chat.sellerId);
+                    console.log('[Email debug] found seller:', {
+                        id: chat.sellerId,
+                        email: seller?.email,
+                        name: seller?.name,
+                    });
 
-                    if (seller?.email) {
-                        await sendNotificationEmail({
-                            to: seller.email,
-                            subject: `Нове повідомлення від ${senderName} — Дім мрії App`,
-                            html: `
+                    if (!seller?.email) {
+                        console.error('[Email error] seller has no email, cannot send notification', {
+                            sellerId: chat.sellerId,
+                            chatId,
+                        });
+                    } else {
+                        try {
+                            const response = await sendNotificationEmail({
+                                to: seller.email,
+                                subject: `Нове повідомлення від ${senderName} — Дім мрії App`,
+                                html: `
                 <h1>Привіт, ${seller.name}!</h1>
                 <p>Покупець <b>${senderName}</b> написав вам повідомлення щодо вашого оголошення.</p>
                 <p><a href="${process.env.FRONTEND_URL}/chat/${chat.listingId}?chatId=${chatId}" style="
@@ -50,9 +61,13 @@ const setupChatSocket = (io: Server) => {
                     border-radius:8px;text-decoration:none;font-weight:bold;
                 ">Відкрити чат</a></p>
             `,
-                        });
-                        // ставимо true тільки якщо email пройшов
-                        await ChatModel.findByIdAndUpdate(chatId, { notified: true });
+                            });
+                            console.log('[Email debug] sendNotificationEmail response:', response);
+                            // ставимо true тільки якщо email пройшов
+                            await ChatModel.findByIdAndUpdate(chatId, { notified: true });
+                        } catch (emailErr) {
+                            console.error('[Email error] sendNotificationEmail failed:', emailErr);
+                        }
                     }
                 }
 
