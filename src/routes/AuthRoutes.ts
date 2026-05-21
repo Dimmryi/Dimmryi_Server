@@ -2,6 +2,7 @@ import express from 'express';
 import {
     handleLogin,
     handleGoogleAuth,
+    handleCheckAuth,
     handleGetSession,
     handleLogout,
     handleForgotPassword,
@@ -11,6 +12,7 @@ import {
 
 const router = express.Router();
 
+router.get('/check-auth', handleCheckAuth);
 router.post('/login', handleLogin);
 router.post('/api/auth/google', handleGoogleAuth);
 router.get('/session', handleGetSession);

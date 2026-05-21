@@ -125,9 +125,23 @@ export const handleGoogleAuth = async (req: any, res: any) => {
     }
 };
 
+export const handleCheckAuth = (req: any, res: any) => {
+    if (req.session.user) {
+        res.json({
+            isAuthenticated: true,
+            user: req.session.user.name,
+            id: req.session.user.id,
+            email: req.session.user.email,
+            expiresAt: req.session.cookie.expires,
+        });
+    } else {
+        res.json({ isAuthenticated: false });
+    }
+};
+
 export const handleGetSession = (req: any, res: any) => {
     if (req.session.user) {
-        res.json({ user: req.session.user.name, expires: req.session.cookie.expires, message: 'Session is active' });
+        res.json({ user: req.session.user.name, expires: req.session.cookie.expires, expiresAt: req.session.cookie.expires, message: 'Session is active' });
     } else {
         res.status(401).json({ message: 'No active session' });
     }
