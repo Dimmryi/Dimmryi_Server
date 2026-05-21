@@ -1,6 +1,6 @@
 # Real Estate Server — Developer Guide
 
-Deployed on **Render.com** (auto-deploy on push to `main`). Frontend: **dimmryi.netlify.app**.
+Deployed on **Render.com** (auto-deploy on push to `main`). Frontend: **......netlify.app**.
 
 ---
 
@@ -41,18 +41,18 @@ pnpm test:coverage  # jest --coverage
 ```
 NODE_ENV=production
 PORT=5000
-MONGO_DB=mongodb+srv://...
+MONGO_DB=<some strinng>
 JWT_SECRET=<32+ char secret>
 COOKIE_SECRET=<cookie secret>
 GOOGLE_CLIENT_ID=<google oauth client id>
 RESEND_API_KEY=<resend api key>
-EMAIL_USER=dimmryi@gmail.com
+EMAIL_USER=<email>
 APP_PASSWORD=<16-char google app password>
-CLOUDINARY_CLOUD_NAME=dm2gavkzs
-CLOUDINARY_API_KEY=196748952826622
+CLOUDINARY_CLOUD_NAME=<some strinng>
+CLOUDINARY_API_KEY=<some strinng>
 CLOUDINARY_API_SECRET=<cloudinary secret>
-ALLOWED_ORIGINS=https://dimmryi.netlify.app
-FRONTEND_URL=https://dimmryi.netlify.app
+ALLOWED_ORIGINS=<some strinng>
+FRONTEND_URL=<some strinng>
 ```
 
 **APP_PASSWORD** is a Google App Password (not your Gmail password). Enable 2FA → https://myaccount.google.com/apppasswords → copy 16-char token.
@@ -256,24 +256,3 @@ Email notification fires only once per conversation (`chat.notified` flag gate).
 - [ ] Health check reachable: `GET /healthz`
 
 ---
-
-## 13. Local Development
-
-```
-PORT=5000
-MONGO_DB=mongodb://localhost:27017/realestatedb
-NODE_ENV=development
-GOOGLE_CLIENT_ID=<your id>
-JWT_SECRET=dev_secret_key_min_32_chars
-COOKIE_SECRET=dev_cookie_key
-EMAIL_USER=dimmryi@gmail.com
-APP_PASSWORD=<app password>
-RESEND_API_KEY=<dev key>
-CLOUDINARY_CLOUD_NAME=dm2gavkzs
-CLOUDINARY_API_KEY=196748952826622
-CLOUDINARY_API_SECRET=<dev secret>
-ALLOWED_ORIGINS=http://localhost:5173
-FRONTEND_URL=http://localhost:5173
-```
-
-Save as `.env` (never commit). Run: `pnpm install && pnpm dev`
