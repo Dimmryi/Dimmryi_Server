@@ -128,34 +128,10 @@ describe('Utility endpoints', () => {
 // ---------------------------------------------------------------------------
 
 describe('Listing endpoints', () => {
-    it('GET /listings → 200 with pagination envelope', async () => {
+    it('GET /listings → 200 with array of all listings', async () => {
         const res = await request(app).get('/listings');
         expect(res.status).toBe(200);
-        expect(res.body).toHaveProperty('listings');
-        expect(res.body).toHaveProperty('total');
-        expect(res.body).toHaveProperty('page');
-        expect(res.body).toHaveProperty('limit');
-        expect(res.body).toHaveProperty('totalPages');
-        expect(Array.isArray(res.body.listings)).toBe(true);
-    });
-
-    it('GET /listings?page=2&limit=5 → correct page/limit echoed back', async () => {
-        const res = await request(app).get('/listings?page=2&limit=5');
-        expect(res.status).toBe(200);
-        expect(res.body.page).toBe(2);
-        expect(res.body.limit).toBe(5);
-    });
-
-    it('GET /listings?limit=0 → clamps limit to 1', async () => {
-        const res = await request(app).get('/listings?limit=0');
-        expect(res.status).toBe(200);
-        expect(res.body.limit).toBeGreaterThanOrEqual(1);
-    });
-
-    it('GET /listings?limit=999 → clamps limit to 100', async () => {
-        const res = await request(app).get('/listings?limit=999');
-        expect(res.status).toBe(200);
-        expect(res.body.limit).toBe(100);
+        expect(Array.isArray(res.body)).toBe(true);
     });
 });
 

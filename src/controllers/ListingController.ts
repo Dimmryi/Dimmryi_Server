@@ -8,6 +8,16 @@ import { sendNotificationEmail } from '../emailService';
 
 export const handleGetListings = async (req: any, res: Response) => {
     try {
+        const listings = await Listing.find().lean();
+        res.json(listings);
+    } catch (error) {
+        res.status(500).json({ error: 'Server error' });
+    }
+};
+
+// Reserved for future use when the project scales and pagination becomes necessary.
+export const handleGetListingsWithPagination = async (req: any, res: Response) => {
+    try {
         const page = Math.max(1, parseInt(req.query.page as string) || 1);
         const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 20));
         const skip = (page - 1) * limit;
