@@ -60,6 +60,8 @@ export const handleLogin = async (req: any, res: any): Promise<void> => {
                 email: user.email,
                 role: user.role,
                 authMethod: user.authMethod,
+                subscribeType: user.subscribeType,
+                subscribeExpired: user.subscribeExpired,
             },
         });
     } catch (error) {
@@ -126,18 +128,30 @@ export const handleGoogleAuth = async (req: any, res: any) => {
     }
 };
 
-export const handleCheckAuth = (req: any, res: any) => {
-    if (req.session.user) {
+export const handleCheckAuth = async (req: any, res: any) => {
+    if (!req.session.user) {
+        return res.json({ isAuthenticated: false });
+    }
+
+    try {
+        const user = await User.findById(req.session.user.id);
+        if (!user) {
+            return res.json({ isAuthenticated: false });
+        }
+
         res.json({
             isAuthenticated: true,
-            user: req.session.user.name,
-            id: req.session.user.id,
-            email: req.session.user.email,
-            role: req.session.user.role,
+            user: user.name,
+            id: user._id.toString(),
+            email: user.email,
+            role: user.role,
+            subscribeType: user.subscribeType,
+            subscribeExpired: user.subscribeExpired,
             expiresAt: req.session.cookie.expires,
         });
-    } else {
-        res.json({ isAuthenticated: false });
+    } catch (error) {
+        console.error('Check auth error:', error);
+        res.status(500).json({ error: 'Server error' });
     }
 };
 

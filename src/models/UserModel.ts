@@ -13,6 +13,8 @@ export interface IUser extends Document {
     passwordResetExpires?: any | null;
     authMethod?: string;
     role: string;
+    subscribeType: 'Free' | 'Standard' | 'Premium';
+    subscribeExpired: Date | null;
 }
 
 const UserSchema: Schema = new Schema({
@@ -34,6 +36,15 @@ const UserSchema: Schema = new Schema({
         enum: ['user', 'admin'],
         default: 'user',
         required: false,
+    },
+    subscribeType: {
+        type: String,
+        enum: ['Free', 'Standard', 'Premium'],
+        default: 'Free',
+    },
+    subscribeExpired: {
+        type: Date,
+        default: null,
     },
 });
 

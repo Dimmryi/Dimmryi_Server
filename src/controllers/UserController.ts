@@ -91,7 +91,14 @@ export const handlePostUsersToBase = async (req: any, res: any) => {
 
         res.status(201).json({
             message: 'User registered successfully!',
-            user: { id: newUser._id, name: newUser.name, email: newUser.email, authMethod: 'password' },
+            user: {
+                id: newUser._id,
+                name: newUser.name,
+                email: newUser.email,
+                authMethod: 'password',
+                subscribeType: newUser.subscribeType,
+                subscribeExpired: newUser.subscribeExpired,
+            },
         });
     } catch (error) {
         console.error(error);
