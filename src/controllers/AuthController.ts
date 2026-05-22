@@ -58,6 +58,7 @@ export const handleLogin = async (req: any, res: any): Promise<void> => {
                 id: user._id.toString(),
                 name: user.name,
                 email: user.email,
+                role: user.role,
                 authMethod: user.authMethod,
             },
         });
@@ -132,6 +133,7 @@ export const handleCheckAuth = (req: any, res: any) => {
             user: req.session.user.name,
             id: req.session.user.id,
             email: req.session.user.email,
+            role: req.session.user.role,
             expiresAt: req.session.cookie.expires,
         });
     } else {
