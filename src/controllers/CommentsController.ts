@@ -9,13 +9,19 @@ export const handleDeleteCommentById = async (req: any, res: any) => {
             return res.status(400).json({ message: `Invalid ID format: ${commentId}` });
         }
 
-        const deleted = await CommentModel.deleteMany({ _id: new mongoose.Types.ObjectId(commentId) });
-
-        if (deleted.deletedCount === 0) {
+        const comment = await CommentModel.findById(commentId);
+        if (!comment) {
             return res.status(404).json({ message: 'Comment not found.' });
         }
 
-        res.status(200).json({ message: 'Comment deleted.', deletedCount: deleted.deletedCount });
+        const isAdmin = req.session.user?.role === 'admin';
+        const isOwner = req.session.user?.id === comment.authorId;
+        if (!isAdmin && !isOwner) {
+            return res.status(403).json({ message: 'Forbidden' });
+        }
+
+        await comment.deleteOne();
+        res.status(200).json({ message: 'Comment deleted.', deletedCount: 1 });
     } catch (error) {
         res.status(500).json({ error: 'Server error' });
     }

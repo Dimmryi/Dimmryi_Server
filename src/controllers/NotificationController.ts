@@ -138,14 +138,19 @@ export const handleDeleteNotification = async (req: any, res: any) => {
             return res.status(400).json({ message: `Invalid ID format: ${notificationId}` });
         }
 
-        const objectId = new mongoose.Types.ObjectId(notificationId);
-        const deleted = await NotificationModel.deleteMany({ _id: objectId });
-
-        if (deleted.deletedCount === 0) {
+        const notification = await NotificationModel.findById(notificationId);
+        if (!notification) {
             return res.status(404).json({ message: 'Notification not found' });
         }
 
-        res.status(200).json({ message: 'Notification deleted.', deletedCount: deleted.deletedCount });
+        const isAdmin = req.session.user?.role === 'admin';
+        const isOwner = req.session.user?.id === notification.userId;
+        if (!isAdmin && !isOwner) {
+            return res.status(403).json({ message: 'Forbidden' });
+        }
+
+        await notification.deleteOne();
+        res.status(200).json({ message: 'Notification deleted.', deletedCount: 1 });
     } catch (error) {
         res.status(500).json({ error: 'Server error' });
     }

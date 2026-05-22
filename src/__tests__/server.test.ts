@@ -158,10 +158,9 @@ describe('Comment endpoints', () => {
 // ---------------------------------------------------------------------------
 
 describe('Notification endpoints', () => {
-    it('GET /api/notifications → 200, returns array', async () => {
+    it('GET /api/notifications → 401 without auth (admin-only)', async () => {
         const res = await request(app).get('/api/notifications');
-        expect(res.status).toBe(200);
-        expect(Array.isArray(res.body)).toBe(true);
+        expect(res.status).toBe(401);
     });
 });
 

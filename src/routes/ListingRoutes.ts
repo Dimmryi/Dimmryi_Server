@@ -13,6 +13,7 @@ import {
     handlePostListingsWithComparison,
     handleUpdateListingById,
 } from '../controllers/ListingController';
+import { requireAuth, requireOwnerOrAdmin } from '../middlewares/AuthMiddleware';
 
 const router = express.Router();
 
@@ -24,10 +25,10 @@ router.get('/api/listings/owner/:userName', handleGetListingsByUserName);
 router.post('/listings', handlePostListings);
 router.post('/api/listingsWithComparison', handlePostListingsWithComparison);
 router.put('/api/listing/:id', handleUpdateListingById);
-router.delete('/api/listing/:id', handleDeleteListingById);
+router.delete('/api/listing/:id', requireAuth, handleDeleteListingById);
 router.delete('/listings/last', handleDeleteLastListing);
 router.delete('/listings/:userId', handleDeleteListingByUserId);
-router.delete('/listings/ownerId/:userId', handleDeleteListingByUserId);
+router.delete('/listings/ownerId/:userId', requireOwnerOrAdmin('userId'), handleDeleteListingByUserId);
 router.delete('/listings/owner/:userName', handleDeleteListingByUserName);
 
 export default router;

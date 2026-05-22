@@ -6,11 +6,12 @@ import {
     handlePostedAndEditUser,
     handleDeleteUserAndAllByUserId
 } from '../controllers/UserController';
+import { requireOwnerOrAdmin } from '../middlewares/AuthMiddleware';
 
 const router = express.Router();
 
 router.delete('/api/users/name/:userName', handleDeleteUserByUserName);
-router.delete('/api/users/:userId', handleDeleteUserByUserId);
+router.delete('/api/users/:userId', requireOwnerOrAdmin('userId'), handleDeleteUserByUserId);
 router.delete('/api/users/:userId/full', handleDeleteUserAndAllByUserId);
 router.post('/api/usersBase', handlePostUsersToBase);
 router.put('/api/listings/:id', handlePostedAndEditUser);

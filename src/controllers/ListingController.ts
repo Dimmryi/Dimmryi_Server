@@ -208,13 +208,19 @@ export const handleDeleteListingById = async (req: any, res: any) => {
             return res.status(400).json({ message: `Invalid ID format: ${id}` });
         }
 
-        const deleted = await Listing.deleteMany({ _id: new mongoose.Types.ObjectId(id) });
-
-        if (deleted.deletedCount === 0) {
+        const listing = await Listing.findById(id);
+        if (!listing) {
             return res.status(404).json({ message: 'No listings found by ID.' });
         }
 
-        res.status(200).json({ message: 'Listing deleted.', deletedCount: deleted.deletedCount });
+        const isAdmin = req.session.user?.role === 'admin';
+        const isOwner = req.session.user?.id === listing.ownerId;
+        if (!isAdmin && !isOwner) {
+            return res.status(403).json({ message: 'Forbidden' });
+        }
+
+        await listing.deleteOne();
+        res.status(200).json({ message: 'Listing deleted.', deletedCount: 1 });
     } catch (error) {
         console.error('Error deleting listing:', error);
         res.status(500).json({ message: 'Failed to delete listing.' });

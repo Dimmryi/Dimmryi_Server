@@ -8,11 +8,11 @@ import {handleDeleteCommentById,
     handlePostComments,
     handleUpdateCommentById,
 } from '../controllers/CommentsController';
-import {checkAuth} from '../middlewares/AuthMiddleware';
+import { checkAuth, requireAuth, requireOwnerOrAdmin } from '../middlewares/AuthMiddleware';
 
 const router = express.Router();
-router.delete('/api/comments/:commentId', handleDeleteCommentById);
-router.delete('/api/comments/author/:authorId', handleDeleteCommentsByAuthorId);
+router.delete('/api/comments/:commentId', requireAuth, handleDeleteCommentById);
+router.delete('/api/comments/author/:authorId', requireOwnerOrAdmin('authorId'), handleDeleteCommentsByAuthorId);
 router.delete('/api/comments/listingId/:listingId', handleDeleteCommentByListingId);
 router.get('/api/comments/authorId/:userId', handleGetCommentsByAuthorId);
 router.get('/api/comments/listingId/:id', handleGetCommentsByListingId);

@@ -1,40 +1,22 @@
-import { Request, Response, NextFunction } from 'express';
-import User from '../models/UserModel';
+import { Response, NextFunction } from 'express';
 
-export const isAdmin = (req: any, res: Response, next: NextFunction) => {
-    if (req.user && req.user.role === 'admin') {
-        next();
-    } else {
-        res.status(403).json({ message: 'Access denied. Admins only.' });
-    }
-};
-
-export const requireAuth = async (req: any, res: Response, next: NextFunction) => {
-    const userId = req.session?.user?.id;
-
-    if (!userId) {
-        return res.status(401).json({ message: 'Not authenticated.' });
-    }
-
-    try {
-        const user = await User.findById(userId);
-
-        if (!user) {
-            req.session.destroy(() => {});
-            return res.status(401).json({ message: 'Session invalid. User not found.' });
-        }
-
-        req.user = user;
-        next();
-    } catch (err) {
-        console.error('Auth middleware error:', err);
-        res.status(500).json({ message: 'Authentication error.' });
-    }
-};
-
-export const checkAuth = async (req: any, res: any, next: NextFunction) => {
-    if (!req.session.user) {
-        return res.status(401).json({ message: 'Not authenticated.' });
-    }
+export const requireAuth = (req: any, res: Response, next: NextFunction) => {
+    if (!req.session?.user) return res.status(401).json({ message: 'Unauthorized' });
     next();
 };
+
+export const requireAdmin = (req: any, res: Response, next: NextFunction) => {
+    if (!req.session?.user) return res.status(401).json({ message: 'Unauthorized' });
+    if (req.session.user.role !== 'admin') return res.status(403).json({ message: 'Forbidden' });
+    next();
+};
+
+export const requireOwnerOrAdmin = (resourceUserIdParam: string) => (req: any, res: Response, next: NextFunction) => {
+    if (!req.session?.user) return res.status(401).json({ message: 'Unauthorized' });
+    const isAdmin = req.session.user.role === 'admin';
+    const isOwner = req.session.user.id === req.params[resourceUserIdParam];
+    if (!isAdmin && !isOwner) return res.status(403).json({ message: 'Forbidden' });
+    next();
+};
+
+export const checkAuth = requireAuth;
