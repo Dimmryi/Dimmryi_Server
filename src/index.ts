@@ -19,6 +19,7 @@ import NotificationRoutes from './routes/NotificationRoutes';
 import ChatRoutes from './routes/ChatRoutes';
 import AdsRoutes from './routes/AdsRoutes';
 import CloudinaryRoutes from './routes/CloudinaryRoutes';
+import SubscribeRoutes from './routes/SubscribeRoutes';
 import setupChatSocket from './socket/chatSocket';
 
 dotenv.config();
@@ -87,6 +88,7 @@ app.use(NotificationRoutes);
 app.use(ChatRoutes);
 app.use(AdsRoutes);
 app.use(CloudinaryRoutes);
+app.use(SubscribeRoutes);
 
 app.get('/healthz', (_req, res) => {
     res.json({ status: 'ok', message: 'Server is running' });
