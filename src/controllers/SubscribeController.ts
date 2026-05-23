@@ -16,7 +16,7 @@ function buildSignature(data: string): string {
         .digest('base64');
 }
 
-function isValidPlan(plan: string): plan is 'standard' | 'premium' {
+function isValidPlan(plan: string): plan is 'standard' | 'premium' | 'Standard' | 'Premium' {
     return plan === 'standard' || plan === 'premium';
 }
 
