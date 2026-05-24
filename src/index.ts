@@ -44,9 +44,20 @@ const app = express();
 // Required for secure cookies behind Render's reverse proxy
 app.set('trust proxy', 1);
 
+const allowedOrigins = [
+    ...(process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim()) : []),
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+];
+
 app.use(cors({
-    //origin: process.env.ALLOWED_ORIGINS || 'http://localhost:5173',
-     origin: ["http://localhost:5173", "http://127.0.0.1:5173"], // Vite dev server
+    origin: (origin, callback) => {
+        if (!origin || allowedOrigins.includes(origin)) {
+            callback(null, true);
+        } else {
+            callback(new Error(`CORS blocked: ${origin}`));
+        }
+    },
     credentials: true,
     allowedHeaders: ['Content-Type', 'Authorization'],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
@@ -106,7 +117,7 @@ const httpServer = createServer(app);
 
 const io = new Server(httpServer, {
     cors: {
-        origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+        origin: allowedOrigins,
         credentials: true,
     },
 });
