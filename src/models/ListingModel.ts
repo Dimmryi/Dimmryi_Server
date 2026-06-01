@@ -11,6 +11,7 @@ const listingSchema = new mongoose.Schema({
     description: { type: String, required: true },
     price: { type: Number, required: true },
     image: { type: [String], required: true },
+    video: { type: [String], required: false, default: [] },
     owner: { type: String, required: true },
     ownerId: { type: String, required: true },
     email: { type: String, required: true },

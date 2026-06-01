@@ -6,6 +6,14 @@ import NotificationModel from '../models/NotificationModel';
 import { getNextListingNumber } from '../utils/getNextListingNumber';
 import { sendNotificationEmail } from '../emailService';
 
+const normalizeStringArray = (value: unknown): string[] => {
+    if (Array.isArray(value)) {
+        return value.filter((item): item is string => typeof item === 'string' && item.trim() !== '');
+    }
+
+    return typeof value === 'string' && value.trim() !== '' ? [value] : [];
+};
+
 export const handleGetListings = async (req: any, res: Response) => {
     try {
         const listings = await Listing.find().lean();
@@ -83,10 +91,11 @@ export const handleGetListingsByUserName = async (req: any, res: any) => {
 
 export const handlePostListings = async (req: any, res: any) => {
     try {
-        const { image, ...rest } = req.body;
+        const { image, video, ...rest } = req.body;
         const listing = new Listing({
-            image: Array.isArray(image) ? image : [image],
             ...rest,
+            image: normalizeStringArray(image),
+            video: normalizeStringArray(video),
         });
         await listing.save();
         res.json({ message: 'Listing added with multiple images!' });
@@ -98,7 +107,15 @@ export const handlePostListings = async (req: any, res: any) => {
 export const handlePostListingsWithComparison = async (req: Request, res: Response) => {
     try {
         const listingNumber = await getNextListingNumber();
-        const newListing = new Listing({ ...req.body, listingNumber, date: Date.now() });
+        const { image, video, videoUrl, ...rest } = req.body;
+        const normalizedVideo = normalizeStringArray(video);
+        const newListing = new Listing({
+            ...rest,
+            image: normalizeStringArray(image),
+            video: normalizedVideo.length ? normalizedVideo : normalizeStringArray(videoUrl),
+            listingNumber,
+            date: Date.now(),
+        });
         await newListing.save();
 
         const notifications = await NotificationModel.find({
@@ -165,13 +182,12 @@ export const handleUpdateListingById = async (req: any, res: any) => {
             return res.status(403).json({ message: `Unauthorized. You must be the owner or an admin.` });
         }
 
-        const allowedUpdates = {
+        const allowedUpdates: Record<string, unknown> = {
             apartmentDetails: updatedData.apartmentDetails,
             description: updatedData.description,
             contact: updatedData.contact,
             price: updatedData.price,
             location: updatedData.location,
-            image: updatedData.image,
             propertyType: updatedData.propertyType,
             typeOfNovelty: updatedData.typeOfNovelty,
             numbersOfRooms: updatedData.numbersOfRooms,
@@ -183,6 +199,15 @@ export const handleUpdateListingById = async (req: any, res: any) => {
             date: Date.now(),
             qualityOfRenovation: updatedData.qualityOfRenovation,
         };
+
+        if (updatedData.image !== undefined) {
+            allowedUpdates.image = normalizeStringArray(updatedData.image);
+        }
+
+        if (updatedData.video !== undefined || updatedData.videoUrl !== undefined) {
+            const normalizedVideo = normalizeStringArray(updatedData.video);
+            allowedUpdates.video = normalizedVideo.length ? normalizedVideo : normalizeStringArray(updatedData.videoUrl);
+        }
 
         const updatedListing = await Listing.findByIdAndUpdate(
             id,
