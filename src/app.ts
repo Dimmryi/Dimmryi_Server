@@ -15,6 +15,7 @@ import ChatRoutes from './routes/ChatRoutes';
 import AdsRoutes from './routes/AdsRoutes';
 import CloudinaryRoutes from './routes/CloudinaryRoutes';
 import SubscribeRoutes from './routes/SubscribeRoutes';
+import FavoriteRoutes from './routes/FavoriteRoutes';
 
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -61,6 +62,7 @@ export function createApp(sessionStore?: Store) {
     app.use(AdsRoutes);
     app.use(CloudinaryRoutes);
     app.use(SubscribeRoutes);
+    app.use(FavoriteRoutes);
 
     app.get('/healthz', (req, res) => {
         res.json({ status: 'ok', message: 'Server is running' });

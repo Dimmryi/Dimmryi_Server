@@ -157,7 +157,10 @@ export const handlePostListingsWithComparison = async (req: Request, res: Respon
             });
         }
 
-        res.status(201).json({ message: 'Listing created and notifications sent.' });
+        res.status(201).json({
+            message: 'Listing created and notifications sent.',
+            listing: newListing,
+        });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Server error' });
@@ -188,6 +191,7 @@ export const handleUpdateListingById = async (req: any, res: any) => {
             contact: updatedData.contact,
             price: updatedData.price,
             location: updatedData.location,
+            listingType: updatedData.listingType,
             propertyType: updatedData.propertyType,
             typeOfNovelty: updatedData.typeOfNovelty,
             numbersOfRooms: updatedData.numbersOfRooms,
