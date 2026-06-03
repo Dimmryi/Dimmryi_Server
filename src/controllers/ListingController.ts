@@ -49,12 +49,6 @@ const buildNotificationQuery = (listing: any) => ({
     maxFloor: { $gte: toNumber(listing.numberOfFloor) },
 });
 
-const maskEmail = (email: string) => {
-    const [name, domain] = email.split('@');
-    if (!name || !domain) return email;
-    return `${name.slice(0, 2)}***@${domain}`;
-};
-
 export const handleGetListings = async (req: any, res: Response) => {
     try {
         const listings = await Listing.find().lean();
@@ -220,62 +214,6 @@ export const handlePostListingsWithComparison = async (req: Request, res: Respon
         res.status(201).json({
             message: 'Listing created and notifications sent.',
             listing: newListing,
-        });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Server error' });
-    }
-};
-
-export const handleDebugNotificationMatch = async (req: Request, res: Response) => {
-    try {
-        const notificationQuery = buildNotificationQuery(req.body);
-        const notifications = await NotificationModel.find(notificationQuery).lean();
-        const listingCoords = hasUsableCoords(req.body.lat, req.body.lon)
-            ? { lat: Number(req.body.lat), lon: Number(req.body.lon) }
-            : null;
-
-        const debug = await Promise.all(notifications.map(async (notification) => {
-            const notificationCoords = hasUsableCoords(notification.lat, notification.lon)
-                ? { lat: Number(notification.lat), lon: Number(notification.lon) }
-                : null;
-            const distanceMeters = listingCoords && notificationCoords
-                ? Math.round(haversine(listingCoords, notificationCoords))
-                : null;
-            const distanceMatches =
-                distanceMeters !== null &&
-                distanceMeters <= Number(notification.locationRange || 0) * 1000;
-            const owner = notification.userId ? await User.findById(notification.userId).lean() : null;
-            const hasActiveSubscription = owner ? hasActiveNotificationSubscription(owner) : false;
-            const normalizedEmail = String(notification.email || '').trim().toLowerCase();
-            const sentToday = normalizedEmail ? await NotificationEmailLogModel.countDocuments({
-                email: normalizedEmail,
-                sentAt: { $gte: new Date(Date.now() - NOTIFICATION_EMAIL_WINDOW_MS) },
-            }) : 0;
-
-            return {
-                notificationId: notification._id?.toString(),
-                email: normalizedEmail ? maskEmail(normalizedEmail) : '',
-                distanceMeters,
-                rangeMeters: Number(notification.locationRange || 0) * 1000,
-                distanceMatches,
-                hasUserId: Boolean(notification.userId),
-                ownerFound: Boolean(owner),
-                subscribeType: owner?.subscribeType || null,
-                subscribeExpired: owner?.subscribeExpired || null,
-                hasActiveSubscription,
-                sentToday,
-                canSend: Boolean(distanceMatches && notification.userId && normalizedEmail && owner && hasActiveSubscription && sentToday < MAX_NOTIFICATION_EMAILS_PER_DAY),
-            };
-        }));
-
-        res.json({
-            notificationQuery,
-            listingCoords,
-            candidatesByFields: notifications.length,
-            distanceMatches: debug.filter((item) => item.distanceMatches).length,
-            canSend: debug.filter((item) => item.canSend).length,
-            debug,
         });
     } catch (error) {
         console.error(error);
