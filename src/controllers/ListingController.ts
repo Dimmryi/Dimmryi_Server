@@ -24,6 +24,37 @@ const hasActiveNotificationSubscription = (user: any) =>
     Boolean(user.subscribeExpired) &&
     new Date(user.subscribeExpired as Date).getTime() > Date.now();
 
+const toNumber = (value: unknown) => {
+    const numberValue = Number(value);
+    return Number.isFinite(numberValue) ? numberValue : 0;
+};
+
+const hasUsableCoords = (lat: unknown, lon: unknown) => {
+    const latNumber = Number(lat);
+    const lonNumber = Number(lon);
+    return Number.isFinite(latNumber) && Number.isFinite(lonNumber) && !(latNumber === 0 && lonNumber === 0);
+};
+
+const buildNotificationQuery = (listing: any) => ({
+    listingType: listing.listingType,
+    propertyType: listing.propertyType,
+    typeOfNovelty: listing.typeOfNovelty,
+    minPrice: { $lte: toNumber(listing.price) },
+    maxPrice: { $gte: toNumber(listing.price) },
+    minNumbersOfRoom: { $lte: toNumber(listing.numbersOfRooms) },
+    maxNumbersOfRoom: { $gte: toNumber(listing.numbersOfRooms) },
+    minTotalArea: { $lte: toNumber(listing.totalArea) },
+    maxTotalArea: { $gte: toNumber(listing.totalArea) },
+    minFloor: { $lte: toNumber(listing.numberOfFloor) },
+    maxFloor: { $gte: toNumber(listing.numberOfFloor) },
+});
+
+const maskEmail = (email: string) => {
+    const [name, domain] = email.split('@');
+    if (!name || !domain) return email;
+    return `${name.slice(0, 2)}***@${domain}`;
+};
+
 export const handleGetListings = async (req: any, res: Response) => {
     try {
         const listings = await Listing.find().lean();
@@ -128,26 +159,25 @@ export const handlePostListingsWithComparison = async (req: Request, res: Respon
         });
         await newListing.save();
 
-        const notifications = await NotificationModel.find({
-            listingType: newListing.listingType,
-            propertyType: newListing.propertyType,
-            typeOfNovelty: newListing.typeOfNovelty,
-            minPrice: { $lte: newListing.price },
-            maxPrice: { $gte: newListing.price },
-            minNumbersOfRoom: { $lte: newListing.numbersOfRooms },
-            maxNumbersOfRoom: { $gte: newListing.numbersOfRooms },
-            minTotalArea: { $lte: newListing.totalArea },
-            maxTotalArea: { $gte: newListing.totalArea },
-            minFloor: { $lte: newListing.numberOfFloor },
-            maxFloor: { $gte: newListing.numberOfFloor },
-        });
+        const notifications = await NotificationModel.find(buildNotificationQuery(newListing));
 
-        const listingCoords = { lat: newListing.lat || 50, lon: newListing.lon || 36 };
+        const listingCoords = hasUsableCoords(newListing.lat, newListing.lon)
+            ? { lat: Number(newListing.lat), lon: Number(newListing.lon) }
+            : null;
 
-        const matchedNotifications = notifications.filter((n) => {
-            const distance = haversine(listingCoords, { lat: n.lat || 50, lon: n.lon || 36 });
+        const matchedNotifications = listingCoords ? notifications.filter((n) => {
+            if (!hasUsableCoords(n.lat, n.lon)) return false;
+            const distance = haversine(listingCoords, { lat: Number(n.lat), lon: Number(n.lon) });
             return distance <= n.locationRange * 1000;
-        });
+        }) : [];
+
+        if (!listingCoords) {
+            res.status(201).json({
+                message: 'Listing created without notification matching because coordinates are missing.',
+                listing: newListing,
+            });
+            return;
+        }
 
         for (const match of matchedNotifications) {
             if (!match.userId || !match.email) continue;
@@ -163,7 +193,7 @@ export const handlePostListingsWithComparison = async (req: Request, res: Respon
 
             if (sentToday >= MAX_NOTIFICATION_EMAILS_PER_DAY) continue;
 
-            const distance = Math.round(haversine(listingCoords, { lat: match.lat || 50, lon: match.lon || 36 }));
+            const distance = Math.round(haversine(listingCoords, { lat: Number(match.lat), lon: Number(match.lon) }));
             await sendNotificationEmail({
                 to: normalizedEmail,
                 subject: 'Нове оголошення відповідає вашим параметрам пошуку',
@@ -190,6 +220,62 @@ export const handlePostListingsWithComparison = async (req: Request, res: Respon
         res.status(201).json({
             message: 'Listing created and notifications sent.',
             listing: newListing,
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Server error' });
+    }
+};
+
+export const handleDebugNotificationMatch = async (req: Request, res: Response) => {
+    try {
+        const notificationQuery = buildNotificationQuery(req.body);
+        const notifications = await NotificationModel.find(notificationQuery).lean();
+        const listingCoords = hasUsableCoords(req.body.lat, req.body.lon)
+            ? { lat: Number(req.body.lat), lon: Number(req.body.lon) }
+            : null;
+
+        const debug = await Promise.all(notifications.map(async (notification) => {
+            const notificationCoords = hasUsableCoords(notification.lat, notification.lon)
+                ? { lat: Number(notification.lat), lon: Number(notification.lon) }
+                : null;
+            const distanceMeters = listingCoords && notificationCoords
+                ? Math.round(haversine(listingCoords, notificationCoords))
+                : null;
+            const distanceMatches =
+                distanceMeters !== null &&
+                distanceMeters <= Number(notification.locationRange || 0) * 1000;
+            const owner = notification.userId ? await User.findById(notification.userId).lean() : null;
+            const hasActiveSubscription = owner ? hasActiveNotificationSubscription(owner) : false;
+            const normalizedEmail = String(notification.email || '').trim().toLowerCase();
+            const sentToday = normalizedEmail ? await NotificationEmailLogModel.countDocuments({
+                email: normalizedEmail,
+                sentAt: { $gte: new Date(Date.now() - NOTIFICATION_EMAIL_WINDOW_MS) },
+            }) : 0;
+
+            return {
+                notificationId: notification._id?.toString(),
+                email: normalizedEmail ? maskEmail(normalizedEmail) : '',
+                distanceMeters,
+                rangeMeters: Number(notification.locationRange || 0) * 1000,
+                distanceMatches,
+                hasUserId: Boolean(notification.userId),
+                ownerFound: Boolean(owner),
+                subscribeType: owner?.subscribeType || null,
+                subscribeExpired: owner?.subscribeExpired || null,
+                hasActiveSubscription,
+                sentToday,
+                canSend: Boolean(distanceMatches && notification.userId && normalizedEmail && owner && hasActiveSubscription && sentToday < MAX_NOTIFICATION_EMAILS_PER_DAY),
+            };
+        }));
+
+        res.json({
+            notificationQuery,
+            listingCoords,
+            candidatesByFields: notifications.length,
+            distanceMatches: debug.filter((item) => item.distanceMatches).length,
+            canSend: debug.filter((item) => item.canSend).length,
+            debug,
         });
     } catch (error) {
         console.error(error);
