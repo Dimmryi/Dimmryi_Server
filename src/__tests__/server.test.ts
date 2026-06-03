@@ -40,7 +40,9 @@ jest.mock('../models/AgentModel', () => ({
     __esModule: true,
     default: {
         find: jest.fn().mockResolvedValue([]),
+        findOne: jest.fn().mockResolvedValue(null),
         findById: jest.fn().mockResolvedValue(null),
+        findOneAndUpdate: jest.fn().mockResolvedValue(null),
         deleteMany: jest.fn().mockResolvedValue({ deletedCount: 0 }),
     },
 }));
@@ -142,6 +144,21 @@ describe('Agent endpoints', () => {
         const res = await request(app).get('/agents');
         expect(res.status).toBe(200);
         expect(Array.isArray(res.body)).toBe(true);
+    });
+
+    it('GET /api/my-agent → 401 without auth', async () => {
+        const res = await request(app).get('/api/my-agent');
+        expect(res.status).toBe(401);
+    });
+
+    it('POST /api/my-agent → 401 without auth', async () => {
+        const res = await request(app).post('/api/my-agent').send({});
+        expect(res.status).toBe(401);
+    });
+
+    it('DELETE /api/my-agent → 401 without auth', async () => {
+        const res = await request(app).delete('/api/my-agent');
+        expect(res.status).toBe(401);
     });
 });
 
