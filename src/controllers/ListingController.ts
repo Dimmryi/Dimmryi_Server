@@ -3,8 +3,13 @@ import mongoose from 'mongoose';
 import haversine from 'haversine-distance';
 import Listing from '../models/ListingModel';
 import NotificationModel from '../models/NotificationModel';
+import NotificationEmailLogModel from '../models/NotificationEmailLogModel';
+import User from '../models/UserModel';
 import { getNextListingNumber } from '../utils/getNextListingNumber';
 import { sendNotificationEmail } from '../emailService';
+
+const MAX_NOTIFICATION_EMAILS_PER_DAY = 4;
+const NOTIFICATION_EMAIL_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 const normalizeStringArray = (value: unknown): string[] => {
     if (Array.isArray(value)) {
@@ -13,6 +18,11 @@ const normalizeStringArray = (value: unknown): string[] => {
 
     return typeof value === 'string' && value.trim() !== '' ? [value] : [];
 };
+
+const hasActiveNotificationSubscription = (user: any) =>
+    (user.subscribeType === 'Standard' || user.subscribeType === 'Premium') &&
+    Boolean(user.subscribeExpired) &&
+    new Date(user.subscribeExpired as Date).getTime() > Date.now();
 
 export const handleGetListings = async (req: any, res: Response) => {
     try {
@@ -140,9 +150,22 @@ export const handlePostListingsWithComparison = async (req: Request, res: Respon
         });
 
         for (const match of matchedNotifications) {
+            if (!match.userId || !match.email) continue;
+
+            const notificationOwner = await User.findById(match.userId);
+            if (!notificationOwner || !hasActiveNotificationSubscription(notificationOwner)) continue;
+
+            const normalizedEmail = String(match.email).trim().toLowerCase();
+            const sentToday = await NotificationEmailLogModel.countDocuments({
+                email: normalizedEmail,
+                sentAt: { $gte: new Date(Date.now() - NOTIFICATION_EMAIL_WINDOW_MS) },
+            });
+
+            if (sentToday >= MAX_NOTIFICATION_EMAILS_PER_DAY) continue;
+
             const distance = Math.round(haversine(listingCoords, { lat: match.lat || 50, lon: match.lon || 36 }));
             await sendNotificationEmail({
-                to: match.email,
+                to: normalizedEmail,
                 subject: 'Нове оголошення відповідає вашим параметрам пошуку',
                 html: `<h2>З'явилося нове оголошення, що відповідає вашим перевагам:</h2>
                 <p>Ціна: ${newListing.price}</p></br>
@@ -154,6 +177,13 @@ export const handlePostListingsWithComparison = async (req: Request, res: Respon
                 <p>Переглянути на сайті:</p>
                 <b>${process.env.ALLOWED_ORIGINS}/details/${newListing.id}</b>
                 <p>З повагою, команда Дім мрії App.</p>`,
+            });
+
+            await NotificationEmailLogModel.create({
+                email: normalizedEmail,
+                notificationId: match._id?.toString(),
+                listingId: newListing._id?.toString(),
+                sentAt: new Date(),
             });
         }
 

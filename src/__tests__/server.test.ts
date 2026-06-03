@@ -61,7 +61,17 @@ jest.mock('../models/NotificationModel', () => ({
     default: {
         find: jest.fn().mockResolvedValue([]),
         findById: jest.fn().mockResolvedValue(null),
+        findByIdAndUpdate: jest.fn().mockResolvedValue(null),
+        countDocuments: jest.fn().mockResolvedValue(0),
         deleteMany: jest.fn().mockResolvedValue({ deletedCount: 0 }),
+    },
+}));
+
+jest.mock('../models/NotificationEmailLogModel', () => ({
+    __esModule: true,
+    default: {
+        countDocuments: jest.fn().mockResolvedValue(0),
+        create: jest.fn().mockResolvedValue({}),
     },
 }));
 

@@ -2,6 +2,9 @@ import mongoose from 'mongoose';
 import { Request, Response } from 'express';
 import NotificationModel from '../models/NotificationModel';
 
+const isNotificationOwnerOrAdmin = (req: any, notification: any) =>
+    req.session.user?.role === 'admin' || req.session.user?.id === notification.userId;
+
 export const handleGetNotifications = async (req: Request, res: Response) => {
     try {
         const notifications = await NotificationModel.find();
@@ -18,14 +21,26 @@ export const handleGetNotificationById = async (req: any, res: any) => {
             return res.status(400).json({ message: `Invalid ID format: ${notificationId}` });
         }
         const notification = await NotificationModel.findById(new mongoose.Types.ObjectId(notificationId));
+        if (!notification) {
+            return res.status(404).json({ message: 'Notification not found' });
+        }
+        if (!isNotificationOwnerOrAdmin(req, notification)) {
+            return res.status(403).json({ message: 'Forbidden' });
+        }
         res.json(notification);
     } catch (error) {
         res.status(500).json({ error: 'Server error' });
     }
 };
 
-export const handleGetNotificationsByUserId = async (req: Request, res: Response) => {
+export const handleGetNotificationsByUserId = async (req: any, res: Response) => {
     try {
+        const isAdmin = req.session.user?.role === 'admin';
+        const isOwner = req.session.user?.id === req.params.userId;
+        if (!isAdmin && !isOwner) {
+            return res.status(403).json({ message: 'Forbidden' });
+        }
+
         const notification = await NotificationModel.find({ userId: req.params.userId });
         if (!notification) {
             res.status(404).json({ message: 'Notification not found' });
@@ -51,6 +66,20 @@ export const handlePostNotification = async (req: any, res: Response) => {
 
         const currentUserId = req.session.user?.id;
         const currentEmail = req.session.user?.email;
+        const isAdmin = req.session.user?.role === 'admin';
+        const targetUserId = isAdmin && userId ? userId : currentUserId;
+        const targetEmail = email || currentEmail;
+
+        if (!targetUserId || !targetEmail) {
+            return res.status(400).json({ message: 'User and email are required.' });
+        }
+
+        if (req.subscriptionUser?.subscribeType === 'Standard') {
+            const existingCount = await NotificationModel.countDocuments({ userId: currentUserId });
+            if (existingCount >= 1) {
+                return res.status(403).json({ message: 'Standard subscription allows one active notification request.' });
+            }
+        }
 
         const newNotification = new NotificationModel({
             listingType, propertyType, typeOfNovelty,
@@ -60,8 +89,8 @@ export const handlePostNotification = async (req: any, res: Response) => {
             minPrice, maxPrice,
             locationSought, locationRange,
             lat, lon,
-            userId: userId || currentUserId,
-            email: email || currentEmail,
+            userId: targetUserId,
+            email: targetEmail,
             date: Date.now(),
         });
         await newNotification.save();
