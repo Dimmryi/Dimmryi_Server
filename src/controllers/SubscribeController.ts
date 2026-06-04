@@ -7,28 +7,47 @@ const PLAN_PRICES: Record<string, number> = {
 };
 
 const SUBSCRIPTION_DURATION_MS = 90 * 24 * 60 * 60 * 1000;
+const SUBSCRIPTION_TEST_MODE = process.env.SUBSCRIPTION_TEST_MODE === 'true';
+const TEST_PUBLIC_KEY = 'dimmryi_subscription_test_public';
+const TEST_PRIVATE_KEY = 'dimmryi_subscription_test_private';
 
 function buildSignature(data: string): string {
-    const privateKey = process.env.LIQPAY_PRIVATE_KEY || '';
+    const privateKey = getLiqpayPrivateKey();
     return crypto
         .createHash('sha1')
         .update(privateKey + data + privateKey)
         .digest('base64');
 }
 
-function isValidPlan(plan: string): plan is 'standard' | 'premium' | 'Standard' | 'Premium' {
+function getLiqpayPublicKey() {
+    return process.env.LIQPAY_PUBLIC_KEY || (SUBSCRIPTION_TEST_MODE ? TEST_PUBLIC_KEY : '');
+}
+
+function getLiqpayPrivateKey() {
+    return process.env.LIQPAY_PRIVATE_KEY || (SUBSCRIPTION_TEST_MODE ? TEST_PRIVATE_KEY : '');
+}
+
+function hasLiqpayKeys() {
+    return Boolean(getLiqpayPublicKey() && getLiqpayPrivateKey());
+}
+
+function isValidPaidPlan(plan: string): plan is 'standard' | 'premium' {
     return plan === 'standard' || plan === 'premium';
 }
 
 export const handleGetLiqpayParams = (req: any, res: any) => {
     const plan = (req.query.plan as string)?.toLowerCase();
 
-    if (!isValidPlan(plan)) {
+    if (!isValidPaidPlan(plan)) {
         return res.status(400).json({ error: 'Invalid plan. Use standard or premium.' });
     }
 
+    if (!hasLiqpayKeys()) {
+        return res.status(503).json({ error: 'LiqPay keys are not configured.' });
+    }
+
     const userId = req.session.user.id;
-    const publicKey = process.env.LIQPAY_PUBLIC_KEY || '';
+    const publicKey = getLiqpayPublicKey();
 
     const payload = {
         public_key: publicKey,
@@ -38,20 +57,30 @@ export const handleGetLiqpayParams = (req: any, res: any) => {
         currency: 'UAH',
         description: plan,
         order_id: `${userId}_${Date.now()}`,
+        sandbox: SUBSCRIPTION_TEST_MODE ? '1' : undefined,
     };
 
     const data = Buffer.from(JSON.stringify(payload)).toString('base64');
     const signature = buildSignature(data);
 
-    res.json({ data, signature });
+    res.json({ data, signature, testMode: SUBSCRIPTION_TEST_MODE });
 };
 
 export const handleSubscribePay = async (req: any, res: any) => {
     try {
-        const { data, signature } = req.body;
+        const { data, signature, plan: requestedPlan } = req.body;
+
+        if (String(requestedPlan).toLowerCase() === 'free') {
+            await User.findByIdAndUpdate(req.session.user.id, { subscribeType: 'Free', subscribeExpired: null });
+            return res.json({ subscribeType: 'Free', subscribeExpired: null });
+        }
 
         if (!data || !signature) {
             return res.status(400).json({ error: 'data and signature are required.' });
+        }
+
+        if (!hasLiqpayKeys()) {
+            return res.status(503).json({ error: 'LiqPay keys are not configured.' });
         }
 
         const expectedSignature = buildSignature(data);
@@ -67,7 +96,7 @@ export const handleSubscribePay = async (req: any, res: any) => {
         }
 
         const plan = decoded.description?.toLowerCase();
-        if (!isValidPlan(plan)) {
+        if (!isValidPaidPlan(plan)) {
             return res.status(400).json({ error: 'Invalid plan in payload.' });
         }
 
@@ -91,6 +120,10 @@ export const handleLiqpayCallback = async (req: any, res: any) => {
             return res.sendStatus(200);
         }
 
+        if (!hasLiqpayKeys()) {
+            return res.sendStatus(200);
+        }
+
         const expectedSignature = buildSignature(data);
         if (expectedSignature !== signature) {
             return res.sendStatus(200);
@@ -104,7 +137,7 @@ export const handleLiqpayCallback = async (req: any, res: any) => {
         }
 
         const plan = decoded.description?.toLowerCase();
-        if (!isValidPlan(plan)) {
+        if (!isValidPaidPlan(plan)) {
             return res.sendStatus(200);
         }
 
