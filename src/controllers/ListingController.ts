@@ -49,6 +49,63 @@ const buildNotificationQuery = (listing: any) => ({
     maxFloor: { $gte: toNumber(listing.numberOfFloor) },
 });
 
+const listingTypeLabel = (value: unknown) => value === 'rent' ? 'Оренда' : 'Продаж';
+
+const propertyTypeLabel = (value: unknown) => {
+    if (value === 'flat') return 'Квартира';
+    if (value === 'private house') return 'Приватний будинок';
+    if (value === 'commercial real estate') return 'Комерційна нерухомість';
+    return 'Нерухомість';
+};
+
+const buildNotificationEmailHtml = (listing: any, distance: number) => {
+    const detailsUrl = `${process.env.ALLOWED_ORIGINS || ''}/details/${listing.id}`;
+    const rows = [
+        ['Тип оголошення', listingTypeLabel(listing.listingType)],
+        ['Тип обʼєкта', propertyTypeLabel(listing.propertyType)],
+        ['Ціна', `${listing.price}`],
+        ['Кількість кімнат', `${listing.numbersOfRooms || 'не вказано'}`],
+        ['Загальна площа', listing.totalArea ? `${listing.totalArea} м²` : 'не вказано'],
+        ['Поверх', listing.numberOfFloor ? `${listing.numberOfFloor}` : 'не вказано'],
+        ['Адреса', listing.location || 'не вказано'],
+        ['Відстань до бажаної точки', `${distance} м`],
+    ];
+
+    return `
+        <div style="margin:0;padding:0;background:#f4f7fb;font-family:Arial,Helvetica,sans-serif;color:#0f172a;">
+            <div style="max-width:640px;margin:0 auto;padding:28px 16px;">
+                <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:16px;overflow:hidden;">
+                    <div style="background:#0f2f57;padding:24px 28px;color:#ffffff;">
+                        <p style="margin:0 0 8px;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:#f5a623;">Дім мрії</p>
+                        <h1 style="margin:0;font-size:24px;line-height:1.25;font-weight:700;">Знайдено нове оголошення за вашими критеріями</h1>
+                    </div>
+                    <div style="padding:24px 28px;">
+                        <p style="margin:0 0 18px;font-size:15px;line-height:1.6;color:#334155;">
+                            Ми знайшли новий обʼєкт, який відповідає параметрам вашого сповіщення.
+                        </p>
+                        <table style="width:100%;border-collapse:collapse;margin:0 0 22px;">
+                            <tbody>
+                                ${rows.map(([label, value]) => `
+                                    <tr>
+                                        <td style="padding:10px 0;border-bottom:1px solid #e2e8f0;color:#64748b;font-size:13px;">${label}</td>
+                                        <td style="padding:10px 0;border-bottom:1px solid #e2e8f0;color:#0f172a;font-size:14px;font-weight:700;text-align:right;">${value}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                        <a href="${detailsUrl}" style="display:inline-block;background:#f5a623;color:#1a0f02;text-decoration:none;font-weight:700;border-radius:10px;padding:12px 18px;">
+                            Переглянути оголошення
+                        </a>
+                        <p style="margin:20px 0 0;font-size:12px;line-height:1.5;color:#64748b;">
+                            Для одного email діє ліміт до 4 таких сповіщень за 24 години.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+};
+
 export const handleGetListings = async (req: any, res: Response) => {
     try {
         const listings = await Listing.find().lean();
@@ -190,17 +247,8 @@ export const handlePostListingsWithComparison = async (req: Request, res: Respon
             const distance = Math.round(haversine(listingCoords, { lat: Number(match.lat), lon: Number(match.lon) }));
             await sendNotificationEmail({
                 to: normalizedEmail,
-                subject: 'Нове оголошення відповідає вашим параметрам пошуку',
-                html: `<h2>З'явилося нове оголошення, що відповідає вашим перевагам:</h2>
-                <p>Ціна: ${newListing.price}</p></br>
-                <p>Тип оголошення: ${newListing.listingType}</p></br>
-                <p>Кількість кімнат: ${newListing.numbersOfRooms}</p></br>
-                <p>Загальна площа: ${newListing.totalArea} м²</p></br>
-                <p>Поверх: ${newListing.numberOfFloor}</p></br>
-                <p>Відстань до бажаної точки: ${distance} метрів</p></br>
-                <p>Переглянути на сайті:</p>
-                <b>${process.env.ALLOWED_ORIGINS}/details/${newListing.id}</b>
-                <p>З повагою, команда Дім мрії App.</p>`,
+                subject: 'Нове оголошення за вашими критеріями',
+                html: buildNotificationEmailHtml(newListing, distance),
             });
 
             await NotificationEmailLogModel.create({
