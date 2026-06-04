@@ -13,7 +13,7 @@ const chatSchema = new mongoose.Schema({
     buyerId:     { type: String, required: true },
     buyerName:   { type: String, required: true },
     sellerId:    { type: String, required: true },
-    sellerEmail: { type: String, required: true },
+    sellerEmail: { type: String, required: false, default: '' },
     messages:    [messageSchema],
     notified:    { type: Boolean, default: false },
 }, { timestamps: true });
