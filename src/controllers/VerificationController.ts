@@ -1,11 +1,14 @@
 import { Response } from 'express';
 import mongoose from 'mongoose';
 import Listing from '../models/ListingModel';
+import User from '../models/UserModel';
 import VerificationRequestModel from '../models/VerificationRequestModel';
 
 const allowedRequestTypes = ['owner', 'representative'];
 const allowedDocumentTypes = ['technicalPassport', 'ownershipExtract', 'representativeDocument'];
 const approvedListingStatuses = ['documentsVerified', 'representativeVerified'];
+const allowedRequestStatuses = ['pending', 'approved', 'rejected'];
+const allowedReviewDecisions = ['documentsVerified', 'representativeVerified', 'rejected'];
 
 const normalizeFiles = (value: unknown) => {
     if (!Array.isArray(value)) return [];
@@ -103,6 +106,89 @@ export const handleGetMyVerificationRequests = async (req: any, res: Response) =
         const requests = await VerificationRequestModel.find(query).sort({ createdAt: -1 }).lean();
         res.json(requests);
     } catch (error) {
+        res.status(500).json({ error: 'Server error' });
+    }
+};
+
+export const handleGetAdminVerificationRequests = async (req: any, res: Response) => {
+    try {
+        const status = typeof req.query.status === 'string' ? req.query.status : '';
+        const query = allowedRequestStatuses.includes(status) ? { status } : {};
+        const requests = await VerificationRequestModel.find(query).sort({ createdAt: -1 }).lean();
+
+        const listingIds = requests
+            .map((request) => request.listingId)
+            .filter((id) => mongoose.Types.ObjectId.isValid(id));
+        const userIds = requests
+            .map((request) => request.userId)
+            .filter((id) => mongoose.Types.ObjectId.isValid(id));
+
+        const [listings, users] = await Promise.all([
+            Listing.find({ _id: { $in: listingIds } }).lean(),
+            User.find({ _id: { $in: userIds } }).select('name email role subscribeType subscribeExpired').lean(),
+        ]);
+
+        const listingById = new Map(listings.map((listing: any) => [String(listing._id), listing]));
+        const userById = new Map(users.map((user: any) => [String(user._id), user]));
+
+        res.json(
+            requests.map((request) => ({
+                ...request,
+                listing: listingById.get(request.listingId) || null,
+                user: userById.get(request.userId) || null,
+            }))
+        );
+    } catch (error) {
+        console.error('Get admin verification requests error:', error);
+        res.status(500).json({ error: 'Server error' });
+    }
+};
+
+export const handleReviewVerificationRequest = async (req: any, res: Response) => {
+    try {
+        const { requestId } = req.params;
+        const { decision, rejectionReason } = req.body;
+
+        if (!mongoose.Types.ObjectId.isValid(requestId)) {
+            return res.status(400).json({ message: 'Invalid verification request id.' });
+        }
+
+        if (!allowedReviewDecisions.includes(decision)) {
+            return res.status(400).json({ message: 'Invalid verification decision.' });
+        }
+
+        const verificationRequest = await VerificationRequestModel.findById(requestId);
+        if (!verificationRequest) {
+            return res.status(404).json({ message: 'Verification request not found.' });
+        }
+
+        const listing = await Listing.findById(verificationRequest.listingId);
+        if (!listing) {
+            return res.status(404).json({ message: 'Listing not found.' });
+        }
+
+        verificationRequest.reviewedBy = req.session.user.id;
+        verificationRequest.reviewedAt = new Date();
+
+        if (decision === 'rejected') {
+            verificationRequest.status = 'rejected';
+            verificationRequest.rejectionReason = typeof rejectionReason === 'string' ? rejectionReason.trim() : '';
+            listing.verificationStatus = 'rejected';
+        } else {
+            verificationRequest.status = 'approved';
+            verificationRequest.rejectionReason = '';
+            listing.verificationStatus = decision;
+        }
+
+        await Promise.all([verificationRequest.save(), listing.save()]);
+
+        res.json({
+            message: 'Verification request reviewed.',
+            request: verificationRequest,
+            listing,
+        });
+    } catch (error) {
+        console.error('Review verification request error:', error);
         res.status(500).json({ error: 'Server error' });
     }
 };
