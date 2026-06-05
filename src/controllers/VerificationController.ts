@@ -9,6 +9,8 @@ const allowedDocumentTypes = ['technicalPassport', 'ownershipExtract', 'represen
 const approvedListingStatuses = ['documentsVerified', 'representativeVerified'];
 const allowedRequestStatuses = ['pending', 'approved', 'rejected'];
 const allowedReviewDecisions = ['documentsVerified', 'representativeVerified', 'rejected'];
+const MAX_VERIFICATION_FILES = 6;
+const MAX_VERIFICATION_FILE_SIZE = 3 * 1024 * 1024;
 
 const normalizeFiles = (value: unknown) => {
     if (!Array.isArray(value)) return [];
@@ -22,12 +24,30 @@ const normalizeFiles = (value: unknown) => {
 
             return {
                 url,
-                publicId: typeof file.publicId === 'string' ? file.publicId : '',
-                resourceType: typeof file.resourceType === 'string' ? file.resourceType : '',
+                publicId: typeof file.publicId === 'string' ? file.publicId.trim() : '',
+                resourceType: typeof file.resourceType === 'string' ? file.resourceType.trim() : '',
+                format: typeof file.format === 'string' ? file.format.trim().toLowerCase() : '',
+                bytes: Number.isFinite(Number(file.bytes)) ? Number(file.bytes) : 0,
                 originalName: typeof file.originalName === 'string' ? file.originalName : '',
             };
         })
         .filter(Boolean);
+};
+
+const validateFiles = (files: any[]) => {
+    if (files.length === 0) return 'At least one verification document is required.';
+    if (files.length > MAX_VERIFICATION_FILES) return 'No more than 6 verification documents are allowed.';
+
+    const fileWithoutPublicId = files.find((file) => !file.publicId);
+    if (fileWithoutPublicId) return 'Verification document publicId is required.';
+
+    const invalidType = files.find((file) => file.resourceType !== 'image' && file.format !== 'pdf');
+    if (invalidType) return 'Only image and PDF verification documents are allowed.';
+
+    const oversized = files.find((file) => file.bytes > MAX_VERIFICATION_FILE_SIZE);
+    if (oversized) return 'Each verification document must be 3 MB or smaller.';
+
+    return '';
 };
 
 export const handleCreateVerificationRequest = async (req: any, res: Response) => {
@@ -48,8 +68,9 @@ export const handleCreateVerificationRequest = async (req: any, res: Response) =
             return res.status(400).json({ message: 'Invalid verification document type.' });
         }
 
-        if (files.length === 0) {
-            return res.status(400).json({ message: 'At least one verification document is required.' });
+        const filesError = validateFiles(files);
+        if (filesError) {
+            return res.status(400).json({ message: filesError });
         }
 
         const listing = await Listing.findById(listingId);

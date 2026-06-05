@@ -5,6 +5,8 @@ const verificationFileSchema = new mongoose.Schema(
         url: { type: String, required: true },
         publicId: { type: String, required: false },
         resourceType: { type: String, required: false },
+        format: { type: String, required: false },
+        bytes: { type: Number, required: false, default: 0 },
         originalName: { type: String, required: false },
     },
     { _id: false }

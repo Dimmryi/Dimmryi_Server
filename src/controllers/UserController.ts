@@ -4,6 +4,11 @@ import bcrypt from 'bcryptjs';
 import User from '../models/UserModel';
 import ListingModel from '../models/ListingModel';
 import CommentModel from '../models/CommentModel';
+import NotificationModel from '../models/NotificationModel';
+import {
+    deleteVerificationDocumentsForListings,
+    deleteVerificationDocumentsForUser,
+} from '../utils/verificationDocumentsCleanup';
 
 export const handleDeleteUserByUserName = async (req: any, res: any) => {
     try {
@@ -28,6 +33,7 @@ export const handleDeleteUserByUserId = async (req: any, res: any) => {
             return res.status(400).json({ message: `Invalid ID format: ${userId}` });
         }
 
+        await deleteVerificationDocumentsForUser(userId);
         const deleted = await User.deleteMany({ _id: new mongoose.Types.ObjectId(userId) });
 
         if (deleted.deletedCount === 0) {
@@ -49,8 +55,14 @@ export const handleDeleteUserAndAllByUserId = async (req: any, res: any) => {
         }
         const objectId = new mongoose.Types.ObjectId(userId);
 
-        await ListingModel.deleteMany({ ownerId: objectId });
-        await CommentModel.deleteMany({ authorId: objectId });
+        const listings = await ListingModel.find({ ownerId: { $in: [userId, objectId] } }).select('_id').lean();
+        const listingIds = listings.map((listing: any) => String(listing._id));
+
+        await deleteVerificationDocumentsForListings(listingIds);
+        await deleteVerificationDocumentsForUser(userId);
+        await ListingModel.deleteMany({ ownerId: { $in: [userId, objectId] } });
+        await CommentModel.deleteMany({ authorId: { $in: [userId, objectId] } });
+        await NotificationModel.deleteMany({ userId });
         const deleted = await User.deleteMany({ _id: objectId });
 
         if (deleted.deletedCount === 0) {

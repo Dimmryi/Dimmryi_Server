@@ -7,6 +7,7 @@ import NotificationEmailLogModel from '../models/NotificationEmailLogModel';
 import User from '../models/UserModel';
 import { getNextListingNumber } from '../utils/getNextListingNumber';
 import { sendNotificationEmail } from '../emailService';
+import { deleteVerificationDocumentsForListings } from '../utils/verificationDocumentsCleanup';
 
 const MAX_NOTIFICATION_EMAILS_PER_DAY = 4;
 const NOTIFICATION_EMAIL_WINDOW_MS = 24 * 60 * 60 * 1000;
@@ -350,6 +351,7 @@ export const handleDeleteListingById = async (req: any, res: any) => {
             return res.status(403).json({ message: 'Forbidden' });
         }
 
+        await deleteVerificationDocumentsForListings([String(listing._id)]);
         await listing.deleteOne();
         res.status(200).json({ message: 'Listing deleted.', deletedCount: 1 });
     } catch (error) {
@@ -361,6 +363,10 @@ export const handleDeleteListingById = async (req: any, res: any) => {
 export const handleDeleteListingByUserId = async (req: any, res: any) => {
     try {
         const { userId } = req.params;
+        const listings = await Listing.find({ ownerId: userId }).select('_id').lean();
+        const listingIds = listings.map((listing: any) => String(listing._id));
+
+        await deleteVerificationDocumentsForListings(listingIds);
         const deleted = await Listing.deleteMany({ ownerId: userId });
 
         if (deleted.deletedCount === 0) {
@@ -377,6 +383,10 @@ export const handleDeleteListingByUserId = async (req: any, res: any) => {
 export const handleDeleteListingByUserName = async (req: any, res: any) => {
     try {
         const { userName } = req.params;
+        const listings = await Listing.find({ owner: userName }).select('_id').lean();
+        const listingIds = listings.map((listing: any) => String(listing._id));
+
+        await deleteVerificationDocumentsForListings(listingIds);
         const deleted = await Listing.deleteMany({ owner: userName });
 
         if (deleted.deletedCount === 0) {
