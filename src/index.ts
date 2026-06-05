@@ -21,6 +21,7 @@ import AdsRoutes from './routes/AdsRoutes';
 import CloudinaryRoutes from './routes/CloudinaryRoutes';
 import SubscribeRoutes from './routes/SubscribeRoutes';
 import FavoriteRoutes from './routes/FavoriteRoutes';
+import VerificationRoutes from './routes/VerificationRoutes';
 import setupChatSocket from './socket/chatSocket';
 
 dotenv.config();
@@ -102,6 +103,7 @@ app.use(AdsRoutes);
 app.use(CloudinaryRoutes);
 app.use(SubscribeRoutes);
 app.use(FavoriteRoutes);
+app.use(VerificationRoutes);
 
 app.get('/healthz', (_req, res) => {
     res.json({ status: 'ok', message: 'Server is running' });

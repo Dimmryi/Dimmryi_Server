@@ -23,6 +23,11 @@ const listingSchema = new mongoose.Schema({
     lat: { type: Number, required: false },
     lon: { type: Number, required: false },
     qualityOfRenovation: { type: String, required: false },
+    verificationStatus: {
+        type: String,
+        enum: ['notVerified', 'pending', 'documentsVerified', 'representativeVerified', 'rejected'],
+        default: 'notVerified',
+    },
 });
 
 const ListingModel = mongoose.model('Listing', listingSchema);
