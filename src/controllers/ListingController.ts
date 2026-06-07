@@ -8,9 +8,11 @@ import User from '../models/UserModel';
 import { getNextListingNumber } from '../utils/getNextListingNumber';
 import { sendNotificationEmail } from '../emailService';
 import { deleteVerificationDocumentsForListings } from '../utils/verificationDocumentsCleanup';
+import { getUsdUahRate } from './ExchangeRateController';
 
 const MAX_NOTIFICATION_EMAILS_PER_DAY = 4;
 const NOTIFICATION_EMAIL_WINDOW_MS = 24 * 60 * 60 * 1000;
+const FALLBACK_USD_TO_UAH = 40;
 
 const normalizeStringArray = (value: unknown): string[] => {
     if (Array.isArray(value)) {
@@ -30,18 +32,33 @@ const toNumber = (value: unknown) => {
     return Number.isFinite(numberValue) ? numberValue : 0;
 };
 
+const normalizeCurrency = (value: unknown) => (value === 'USD' ? 'USD' : 'UAH');
+
+const getListingPriceInUah = async (listing: any) => {
+    const price = toNumber(listing.price);
+    if (normalizeCurrency(listing.currency) !== 'USD') return price;
+
+    try {
+        const rate = await getUsdUahRate();
+        return price * rate.rate;
+    } catch (error) {
+        console.error('Notification price conversion fallback:', error);
+        return price * FALLBACK_USD_TO_UAH;
+    }
+};
+
 const hasUsableCoords = (lat: unknown, lon: unknown) => {
     const latNumber = Number(lat);
     const lonNumber = Number(lon);
     return Number.isFinite(latNumber) && Number.isFinite(lonNumber) && !(latNumber === 0 && lonNumber === 0);
 };
 
-const buildNotificationQuery = (listing: any) => ({
+const buildNotificationQuery = (listing: any, priceInUah: number) => ({
     listingType: listing.listingType,
     propertyType: listing.propertyType,
     typeOfNovelty: listing.typeOfNovelty,
-    minPrice: { $lte: toNumber(listing.price) },
-    maxPrice: { $gte: toNumber(listing.price) },
+    minPrice: { $lte: priceInUah },
+    maxPrice: { $gte: priceInUah },
     minNumbersOfRoom: { $lte: toNumber(listing.numbersOfRooms) },
     maxNumbersOfRoom: { $gte: toNumber(listing.numbersOfRooms) },
     minTotalArea: { $lte: toNumber(listing.totalArea) },
@@ -61,10 +78,12 @@ const propertyTypeLabel = (value: unknown) => {
 
 const buildNotificationEmailHtml = (listing: any, distance: number) => {
     const detailsUrl = `${process.env.ALLOWED_ORIGINS || ''}/details/${listing.id}`;
+    const currency = normalizeCurrency(listing.currency);
+    const priceLabel = currency === 'USD' ? `$${listing.price}` : `₴${listing.price}`;
     const rows = [
         ['Тип оголошення', listingTypeLabel(listing.listingType)],
         ['Тип обʼєкта', propertyTypeLabel(listing.propertyType)],
-        ['Ціна', `${listing.price}`],
+        ['Ціна', priceLabel],
         ['Кількість кімнат', `${listing.numbersOfRooms || 'не вказано'}`],
         ['Загальна площа', listing.totalArea ? `${listing.totalArea} м²` : 'не вказано'],
         ['Поверх', listing.numberOfFloor ? `${listing.numberOfFloor}` : 'не вказано'],
@@ -187,6 +206,7 @@ export const handlePostListings = async (req: any, res: any) => {
         const { image, video, ...rest } = req.body;
         const listing = new Listing({
             ...rest,
+            currency: normalizeCurrency(rest.currency),
             image: normalizeStringArray(image),
             video: normalizeStringArray(video),
         });
@@ -204,6 +224,7 @@ export const handlePostListingsWithComparison = async (req: Request, res: Respon
         const normalizedVideo = normalizeStringArray(video);
         const newListing = new Listing({
             ...rest,
+            currency: normalizeCurrency(rest.currency),
             image: normalizeStringArray(image),
             video: normalizedVideo.length ? normalizedVideo : normalizeStringArray(videoUrl),
             listingNumber,
@@ -211,7 +232,8 @@ export const handlePostListingsWithComparison = async (req: Request, res: Respon
         });
         await newListing.save();
 
-        const notifications = await NotificationModel.find(buildNotificationQuery(newListing));
+        const listingPriceInUah = await getListingPriceInUah(newListing);
+        const notifications = await NotificationModel.find(buildNotificationQuery(newListing, listingPriceInUah));
 
         const listingCoords = hasUsableCoords(newListing.lat, newListing.lon)
             ? { lat: Number(newListing.lat), lon: Number(newListing.lon) }
@@ -293,6 +315,7 @@ export const handleUpdateListingById = async (req: any, res: any) => {
             description: updatedData.description,
             contact: updatedData.contact,
             price: updatedData.price,
+            currency: normalizeCurrency(updatedData.currency),
             location: updatedData.location,
             listingType: updatedData.listingType,
             propertyType: updatedData.propertyType,

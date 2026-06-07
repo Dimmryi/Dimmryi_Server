@@ -10,6 +10,8 @@ import {
     deleteVerificationDocumentsForUser,
 } from '../utils/verificationDocumentsCleanup';
 
+const normalizeCurrency = (value: unknown) => (value === 'USD' ? 'USD' : 'UAH');
+
 export const handleDeleteUserByUserName = async (req: any, res: any) => {
     try {
         const { userName } = req.params;
@@ -142,6 +144,7 @@ export const handlePostedAndEditUser = async (req: any, res: any) => {
             description: updatedData.description,
             contact: updatedData.contact,
             price: updatedData.price,
+            currency: normalizeCurrency(updatedData.currency),
             location: updatedData.location,
             image: updatedData.image,
             propertyType: updatedData.propertyType,

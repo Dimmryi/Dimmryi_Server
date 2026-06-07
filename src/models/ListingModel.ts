@@ -10,6 +10,7 @@ const listingSchema = new mongoose.Schema({
     apartmentDetails: { type: String, required: true },
     description: { type: String, required: true },
     price: { type: Number, required: true },
+    currency: { type: String, enum: ['UAH', 'USD'], default: 'UAH' },
     image: { type: [String], required: true },
     video: { type: [String], required: false, default: [] },
     owner: { type: String, required: true },

@@ -23,6 +23,7 @@ import SubscribeRoutes from './routes/SubscribeRoutes';
 import FavoriteRoutes from './routes/FavoriteRoutes';
 import VerificationRoutes from './routes/VerificationRoutes';
 import PriceAnalyticsRoutes from './routes/PriceAnalyticsRoutes';
+import ExchangeRateRoutes from './routes/ExchangeRateRoutes';
 import setupChatSocket from './socket/chatSocket';
 
 dotenv.config();
@@ -106,6 +107,7 @@ app.use(SubscribeRoutes);
 app.use(FavoriteRoutes);
 app.use(VerificationRoutes);
 app.use(PriceAnalyticsRoutes);
+app.use(ExchangeRateRoutes);
 
 app.get('/healthz', (_req, res) => {
     res.json({ status: 'ok', message: 'Server is running' });
