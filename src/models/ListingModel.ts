@@ -29,6 +29,14 @@ const listingSchema = new mongoose.Schema({
         enum: ['notVerified', 'pending', 'documentsVerified', 'representativeVerified', 'rejected'],
         default: 'notVerified',
     },
+    promotionStatus: {
+        type: String,
+        enum: ['none', 'pending', 'active', 'expired'],
+        default: 'none',
+    },
+    promotionStartedAt: { type: Date, required: false },
+    promotionExpiresAt: { type: Date, required: false },
+    promotionPriority: { type: Number, required: false, default: 0 },
 });
 
 const ListingModel = mongoose.model('Listing', listingSchema);

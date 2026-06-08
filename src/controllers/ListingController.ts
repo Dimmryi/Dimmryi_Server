@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import mongoose from 'mongoose';
 import haversine from 'haversine-distance';
 import Listing from '../models/ListingModel';
+import FavoriteModel from '../models/FavoriteModel';
 import NotificationModel from '../models/NotificationModel';
 import NotificationEmailLogModel from '../models/NotificationEmailLogModel';
 import User from '../models/UserModel';
@@ -13,6 +14,8 @@ import { getUsdUahRate } from './ExchangeRateController';
 const MAX_NOTIFICATION_EMAILS_PER_DAY = 4;
 const NOTIFICATION_EMAIL_WINDOW_MS = 24 * 60 * 60 * 1000;
 const FALLBACK_USD_TO_UAH = 40;
+const FEATURED_SLOT_LIMIT = 4;
+const PAID_SUBSCRIPTION_TYPES = ['Standard', 'Premium'];
 
 const normalizeStringArray = (value: unknown): string[] => {
     if (Array.isArray(value)) {
@@ -27,10 +30,108 @@ const hasActiveNotificationSubscription = (user: any) =>
     Boolean(user.subscribeExpired) &&
     new Date(user.subscribeExpired as Date).getTime() > Date.now();
 
+const hasActivePaidSubscription = (user: any) =>
+    PAID_SUBSCRIPTION_TYPES.includes(user?.subscribeType) &&
+    Boolean(user?.subscribeExpired) &&
+    new Date(user.subscribeExpired as Date).getTime() > Date.now();
+
 const toNumber = (value: unknown) => {
     const numberValue = Number(value);
     return Number.isFinite(numberValue) ? numberValue : 0;
 };
+
+const toTimestamp = (value: unknown) => {
+    const numericValue = Number(value);
+    if (Number.isFinite(numericValue) && numericValue > 0) return numericValue;
+
+    const parsedValue = Date.parse(String(value || ''));
+    return Number.isFinite(parsedValue) ? parsedValue : 0;
+};
+
+const hasPublicImage = (listing: any) =>
+    Array.isArray(listing.image) &&
+    listing.image.some((image: unknown) => typeof image === 'string' && image.trim() !== '');
+
+const hasPublicLocation = (listing: any) =>
+    typeof listing.location === 'string' && listing.location.trim() !== '';
+
+const hasValidPublicPrice = (listing: any) => toNumber(listing.price) > 0;
+
+const isEligibleForFeatured = (listing: any) =>
+    Boolean(listing?._id) &&
+    hasPublicImage(listing) &&
+    hasPublicLocation(listing) &&
+    hasValidPublicPrice(listing);
+
+const isActivePromotion = (listing: any) => {
+    if (listing.promotionStatus !== 'active') return false;
+    if (!listing.promotionExpiresAt) return true;
+    return new Date(listing.promotionExpiresAt).getTime() > Date.now();
+};
+
+const getQualityScore = (listing: any, ownerHasActivePaidSubscription: boolean, isPromotionActive: boolean) => {
+    const imageCount = Array.isArray(listing.image)
+        ? listing.image.filter((image: unknown) => typeof image === 'string' && image.trim() !== '').length
+        : 0;
+    const hasCoords = Number.isFinite(Number(listing.lat)) && Number.isFinite(Number(listing.lon)) && !(Number(listing.lat) === 0 && Number(listing.lon) === 0);
+    const isVerified = listing.verificationStatus === 'documentsVerified' || listing.verificationStatus === 'representativeVerified';
+
+    return [
+        Math.min(imageCount, 6) * 3,
+        listing.description ? 3 : 0,
+        listing.apartmentDetails ? 2 : 0,
+        listing.totalArea ? 2 : 0,
+        listing.numbersOfRooms ? 1 : 0,
+        hasCoords ? 2 : 0,
+        isVerified ? 4 : 0,
+        ownerHasActivePaidSubscription ? 3 : 0,
+        isPromotionActive ? 8 : 0,
+    ].reduce((sum, value) => sum + value, 0);
+};
+
+const sortByDateDesc = (a: any, b: any) => b.publishedAt - a.publishedAt;
+
+const sortByPaidQuality = (a: any, b: any) => {
+    const subscriptionWeight = (value: any) => value.ownerSubscribeType === 'Premium' ? 2 : value.ownerSubscribeType === 'Standard' ? 1 : 0;
+    return (
+        subscriptionWeight(b) - subscriptionWeight(a) ||
+        b.qualityScore - a.qualityScore ||
+        b.publishedAt - a.publishedAt
+    );
+};
+
+const sortByPromotion = (a: any, b: any) => (
+    Number(b.isPromotionActive) - Number(a.isPromotionActive) ||
+    b.promotionPriority - a.promotionPriority ||
+    b.qualityScore - a.qualityScore ||
+    b.publishedAt - a.publishedAt
+);
+
+const sortByFavorites = (a: any, b: any) => (
+    b.favoriteCount - a.favoriteCount ||
+    b.lastFavoritedAt - a.lastFavoritedAt ||
+    b.qualityScore - a.qualityScore ||
+    b.publishedAt - a.publishedAt
+);
+
+const pickFeaturedListing = (candidates: any[], usedIds: Set<string>) => {
+    const listing = candidates.find((candidate) => !usedIds.has(candidate.id));
+    if (listing) usedIds.add(listing.id);
+    return listing || null;
+};
+
+const buildFeaturedSlot = (slot: string, item: any) => ({
+    slot,
+    listing: {
+        ...item.listing,
+        favoriteCount: item.favoriteCount,
+        lastFavoritedAt: item.lastFavoritedAt ? new Date(item.lastFavoritedAt).toISOString() : null,
+        ownerSubscribeType: item.ownerSubscribeType,
+        ownerSubscribeExpired: item.ownerSubscribeExpired,
+        ownerHasActivePaidSubscription: item.ownerHasActivePaidSubscription,
+        isPromoted: item.isPromotionActive,
+    },
+});
 
 const normalizeCurrency = (value: unknown) => (value === 'USD' ? 'USD' : 'UAH');
 
@@ -131,6 +232,112 @@ export const handleGetListings = async (req: any, res: Response) => {
         const listings = await Listing.find().lean();
         res.json(listings);
     } catch (error) {
+        res.status(500).json({ error: 'Server error' });
+    }
+};
+
+export const handleGetFeaturedListings = async (req: any, res: Response) => {
+    try {
+        const listings = await Listing.find().lean();
+        const eligibleListings = listings.filter(isEligibleForFeatured);
+
+        if (eligibleListings.length === 0) {
+            return res.json({ items: [], generatedAt: new Date().toISOString() });
+        }
+
+        const ownerIds = Array.from(new Set(
+            eligibleListings
+                .map((listing: any) => String(listing.ownerId || ''))
+                .filter((ownerId) => mongoose.Types.ObjectId.isValid(ownerId)),
+        ));
+
+        const [owners, favoriteStats] = await Promise.all([
+            ownerIds.length
+                ? User.find({ _id: { $in: ownerIds.map((ownerId) => new mongoose.Types.ObjectId(ownerId)) } })
+                    .select('subscribeType subscribeExpired')
+                    .lean()
+                : Promise.resolve([]),
+            FavoriteModel.aggregate([
+                {
+                    $group: {
+                        _id: '$listingId',
+                        count: { $sum: 1 },
+                        lastFavoritedAt: { $max: '$createdAt' },
+                    },
+                },
+            ]),
+        ]);
+
+        const ownerById = new Map(owners.map((owner: any) => [String(owner._id), owner]));
+        const favoriteStatsByListingId = new Map(
+            favoriteStats.map((item: any) => [
+                String(item._id),
+                {
+                    count: Number(item.count || 0),
+                    lastFavoritedAt: item.lastFavoritedAt ? new Date(item.lastFavoritedAt).getTime() : 0,
+                },
+            ]),
+        );
+
+        const enrichedListings = eligibleListings.map((listing: any) => {
+            const id = String(listing._id);
+            const owner = ownerById.get(String(listing.ownerId || ''));
+            const ownerHasActivePaidSubscription = hasActivePaidSubscription(owner);
+            const favoriteStat = favoriteStatsByListingId.get(id);
+            const isPromotionActive = isActivePromotion(listing);
+
+            return {
+                id,
+                listing,
+                publishedAt: toTimestamp(listing.date),
+                favoriteCount: favoriteStat?.count || 0,
+                lastFavoritedAt: favoriteStat?.lastFavoritedAt || 0,
+                ownerSubscribeType: owner?.subscribeType || 'Free',
+                ownerSubscribeExpired: owner?.subscribeExpired || null,
+                ownerHasActivePaidSubscription,
+                isPromotionActive,
+                promotionPriority: toNumber(listing.promotionPriority),
+                qualityScore: getQualityScore(listing, ownerHasActivePaidSubscription, isPromotionActive),
+            };
+        });
+
+        const usedIds = new Set<string>();
+        const paidListings = enrichedListings.filter((listing) => listing.ownerHasActivePaidSubscription);
+        const promotedListings = enrichedListings.filter((listing) => listing.isPromotionActive);
+        const rentListings = enrichedListings.filter((listing) => listing.listing.listingType === 'rent');
+        const favoritesListings = enrichedListings.filter((listing) => listing.favoriteCount > 0);
+
+        const newest = pickFeaturedListing(
+            [...paidListings].sort(sortByDateDesc).concat([...enrichedListings].sort(sortByDateDesc)),
+            usedIds,
+        );
+        const premium = pickFeaturedListing(
+            [...promotedListings].sort(sortByPromotion)
+                .concat([...paidListings].sort(sortByPaidQuality))
+                .concat([...enrichedListings].sort(sortByPaidQuality)),
+            usedIds,
+        );
+        const rent = pickFeaturedListing(
+            [...rentListings.filter((listing) => listing.ownerHasActivePaidSubscription)].sort(sortByDateDesc)
+                .concat([...rentListings].sort(sortByDateDesc)),
+            usedIds,
+        );
+        const topChoice = pickFeaturedListing(
+            [...favoritesListings].sort(sortByFavorites)
+                .concat([...enrichedListings].sort(sortByFavorites)),
+            usedIds,
+        );
+
+        const items = [
+            newest ? buildFeaturedSlot('new', newest) : null,
+            premium ? buildFeaturedSlot('premium', premium) : null,
+            rent ? buildFeaturedSlot('rent', rent) : null,
+            topChoice ? buildFeaturedSlot('top', topChoice) : null,
+        ].filter(Boolean).slice(0, FEATURED_SLOT_LIMIT);
+
+        res.json({ items, generatedAt: new Date().toISOString() });
+    } catch (error) {
+        console.error('Featured listings error:', error);
         res.status(500).json({ error: 'Server error' });
     }
 };

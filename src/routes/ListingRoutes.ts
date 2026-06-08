@@ -9,6 +9,7 @@ import {
     handleGetListingsByOwnerId,
     handleGetListingsByUserName,
     handleGetListings,
+    handleGetFeaturedListings,
     handlePostListings,
     handlePostListingsWithComparison,
     handleUpdateListingById,
@@ -18,6 +19,7 @@ import { requireAuth, requireOwnerOrAdmin } from '../middlewares/AuthMiddleware'
 const router = express.Router();
 
 router.get('/listings', handleGetListings);
+router.get('/api/featured-listings', handleGetFeaturedListings);
 router.get('/listing/:id', handleGetListingById);
 router.get('/api/listings/:id', handleGetListingsById);
 router.get('/api/listings/ownerId/:userId', handleGetListingsByOwnerId);
