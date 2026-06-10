@@ -33,6 +33,17 @@ const buildListingSnapshot = (listing: any) => ({
     currency: listing.currency || 'UAH',
 });
 
+const getValidationFields = (error: mongoose.Error.ValidationError) => Object.keys(error.errors);
+
+const sendListingValidationError = (res: Response, error: unknown, message: string) => {
+    if (error instanceof mongoose.Error.ValidationError) {
+        res.status(422).json({ message, fields: getValidationFields(error) });
+        return true;
+    }
+
+    return false;
+};
+
 export const handleCreatePromotionRequest = async (req: any, res: Response) => {
     try {
         const requestType = sanitizeText(req.body.requestType);
@@ -78,6 +89,14 @@ export const handleCreatePromotionRequest = async (req: any, res: Response) => {
             return res.status(400).json({ message: 'User name and email are required.' });
         }
 
+        if (listing) {
+            listing.promotionStatus = 'pending';
+            const validationError = listing.validateSync();
+            if (validationError) {
+                return sendListingValidationError(res, validationError, 'Listing must be updated to the current listing format before a promotion request can be submitted.');
+            }
+        }
+
         const promotionRequest = await PromotionRequestModel.create({
             userId: req.session.user.id,
             name,
@@ -92,7 +111,6 @@ export const handleCreatePromotionRequest = async (req: any, res: Response) => {
         });
 
         if (listing) {
-            listing.promotionStatus = 'pending';
             await listing.save();
         }
 
@@ -102,6 +120,9 @@ export const handleCreatePromotionRequest = async (req: any, res: Response) => {
         });
     } catch (error) {
         console.error('Create promotion request error:', error);
+        if (sendListingValidationError(res, error, 'Listing must be updated to the current listing format before a promotion request can be submitted.')) {
+            return;
+        }
         res.status(500).json({ error: 'Server error' });
     }
 };
@@ -158,13 +179,9 @@ export const handleUpdateAdminPromotionRequest = async (req: any, res: Response)
             return res.status(404).json({ message: 'Promotion request not found.' });
         }
 
-        promotionRequest.status = nextStatus;
-        promotionRequest.adminNote = adminNote;
-        promotionRequest.reviewedBy = req.session.user.id;
-        promotionRequest.reviewedAt = new Date();
-
+        const statusChanged = promotionRequest.status !== nextStatus;
         const listingId = promotionRequest.listingId;
-        const listing = listingId && mongoose.Types.ObjectId.isValid(listingId)
+        const listing = statusChanged && listingId && mongoose.Types.ObjectId.isValid(listingId)
             ? await Listing.findById(listingId)
             : null;
 
@@ -179,7 +196,17 @@ export const handleUpdateAdminPromotionRequest = async (req: any, res: Response)
             } else {
                 listing.promotionStatus = 'pending';
             }
+
+            const validationError = listing.validateSync();
+            if (validationError) {
+                return sendListingValidationError(res, validationError, 'Listing must be updated to the current listing format before this promotion status can be applied.');
+            }
         }
+
+        promotionRequest.status = nextStatus;
+        promotionRequest.adminNote = adminNote;
+        promotionRequest.reviewedBy = req.session.user.id;
+        promotionRequest.reviewedAt = new Date();
 
         await Promise.all([
             promotionRequest.save(),
@@ -193,6 +220,9 @@ export const handleUpdateAdminPromotionRequest = async (req: any, res: Response)
         });
     } catch (error) {
         console.error('Update admin promotion request error:', error);
+        if (sendListingValidationError(res, error, 'Listing must be updated to the current listing format before this promotion status can be applied.')) {
+            return;
+        }
         res.status(500).json({ error: 'Server error' });
     }
 };
