@@ -19,6 +19,7 @@ import FavoriteRoutes from './routes/FavoriteRoutes';
 import VerificationRoutes from './routes/VerificationRoutes';
 import PriceAnalyticsRoutes from './routes/PriceAnalyticsRoutes';
 import ExchangeRateRoutes from './routes/ExchangeRateRoutes';
+import PromotionRequestRoutes from './routes/PromotionRequestRoutes';
 
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -69,6 +70,7 @@ export function createApp(sessionStore?: Store) {
     app.use(VerificationRoutes);
     app.use(PriceAnalyticsRoutes);
     app.use(ExchangeRateRoutes);
+    app.use(PromotionRequestRoutes);
 
     app.get('/healthz', (req, res) => {
         res.json({ status: 'ok', message: 'Server is running' });
