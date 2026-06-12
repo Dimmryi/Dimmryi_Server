@@ -11,6 +11,7 @@ jest.mock('cloudinary', () => ({
 const mockListingChain = {
     skip: jest.fn().mockReturnThis(),
     limit: jest.fn().mockReturnThis(),
+    sort: jest.fn().mockReturnThis(),
     lean: jest.fn().mockResolvedValue([]),
 };
 
@@ -110,6 +111,8 @@ jest.mock('../emailService', () => ({
 
 import request from 'supertest';
 import { createApp } from '../app';
+import AgentModel from '../models/AgentModel';
+import Listing from '../models/ListingModel';
 
 const app = createApp();
 
@@ -154,6 +157,28 @@ describe('Agent endpoints', () => {
         const res = await request(app).get('/agents');
         expect(res.status).toBe(200);
         expect(Array.isArray(res.body)).toBe(true);
+    });
+
+    it('GET /api/agents/:agentId/listings → 200 with agent and listings', async () => {
+        const agentId = '64b7f6ec9feadf0012d8a001';
+        const userId = '64b7f6ec9feadf0012d8a002';
+        const agent = { _id: agentId, userId, name: 'Agent', image: [], jobTitle: 'Realtor', email: 'agent@example.com' };
+        const listings = [{ _id: '64b7f6ec9feadf0012d8a003', ownerId: userId, location: 'Kharkiv' }];
+        const listingChain = { sort: jest.fn().mockReturnThis(), lean: jest.fn().mockResolvedValue(listings) };
+
+        (AgentModel.findOne as jest.Mock).mockReturnValueOnce({ lean: jest.fn().mockResolvedValue(agent) });
+        (Listing.find as jest.Mock).mockReturnValueOnce(listingChain);
+
+        const res = await request(app).get(`/api/agents/${agentId}/listings`);
+
+        expect(res.status).toBe(200);
+        expect(res.body.agent._id).toBe(agentId);
+        expect(res.body.listings).toHaveLength(1);
+    });
+
+    it('GET /api/agents/:agentId/listings → 400 for invalid id', async () => {
+        const res = await request(app).get('/api/agents/not-valid/listings');
+        expect(res.status).toBe(400);
     });
 
     it('GET /api/my-agent → 401 without auth', async () => {

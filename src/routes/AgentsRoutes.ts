@@ -3,6 +3,7 @@ import {
     handleDeleteAgentById,
     handleGetAgents,
     handleGetAgentsById,
+    handleGetAgentListings,
     handleGetMyAgent,
     handleHideMyAgent,
     handlePostAgents,
@@ -16,6 +17,7 @@ const router = express.Router();
 
 router.delete('/api/agents/:agentId', requireAdmin, handleDeleteAgentById);
 router.get('/agents', handleGetAgents);
+router.get('/api/agents/:agentId/listings', handleGetAgentListings);
 router.get('/api/agents/:id', handleGetAgentsById);
 router.post('/agents', requireAdmin, handlePostAgents);
 router.put('/api/agents/:id', requireAdmin, handleUpdateAgentsData);

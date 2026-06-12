@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import mongoose from 'mongoose';
 import AgentModel from '../models/AgentModel';
+import Listing from '../models/ListingModel';
 
 const normalizeAgentImage = (image: unknown) => {
     if (Array.isArray(image)) {
@@ -26,6 +27,8 @@ const getAgentPayload = (body: any) => {
         date: date || Date.now().toString(),
     };
 };
+
+const visibleAgentQuery = { isActive: { $ne: false }, status: { $ne: 'hidden' } };
 
 const hasRequiredAgentFields = (payload: ReturnType<typeof getAgentPayload>) =>
     payload.image.length > 0 &&
@@ -57,7 +60,7 @@ export const handleDeleteAgentById = async (req: any, res: any) => {
 
 export const handleGetAgents = async (req: Request, res: Response) => {
     try {
-        const agents = await AgentModel.find({ isActive: { $ne: false }, status: { $ne: 'hidden' } });
+        const agents = await AgentModel.find(visibleAgentQuery);
         res.json(agents);
     } catch (error) {
         res.status(500).json({ error: 'Server error' });
@@ -72,6 +75,42 @@ export const handleGetAgentsById = async (req: any, res: any) => {
             return;
         }
         res.json(agent);
+    } catch (error) {
+        res.status(500).json({ error: 'Server error' });
+    }
+};
+
+export const handleGetAgentListings = async (req: Request, res: Response) => {
+    try {
+        const { agentId } = req.params;
+
+        if (!mongoose.Types.ObjectId.isValid(agentId)) {
+            return res.status(400).json({ message: `Invalid agent ID format: ${agentId}` });
+        }
+
+        const agent = await AgentModel.findOne({
+            _id: new mongoose.Types.ObjectId(agentId),
+            ...visibleAgentQuery,
+        }).lean();
+
+        if (!agent) {
+            return res.status(404).json({ message: 'Agent not found.' });
+        }
+
+        if (!agent.userId) {
+            return res.json({ agent, listings: [] });
+        }
+
+        const ownerIdValues: Array<string | mongoose.Types.ObjectId> = [String(agent.userId)];
+        if (mongoose.Types.ObjectId.isValid(agent.userId)) {
+            ownerIdValues.push(new mongoose.Types.ObjectId(agent.userId));
+        }
+
+        const listings = await Listing.find({ ownerId: { $in: ownerIdValues } })
+            .sort({ date: -1 })
+            .lean();
+
+        res.json({ agent, listings });
     } catch (error) {
         res.status(500).json({ error: 'Server error' });
     }
