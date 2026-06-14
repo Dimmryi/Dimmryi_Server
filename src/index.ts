@@ -26,6 +26,7 @@ import PriceAnalyticsRoutes from './routes/PriceAnalyticsRoutes';
 import ExchangeRateRoutes from './routes/ExchangeRateRoutes';
 import PromotionRequestRoutes from './routes/PromotionRequestRoutes';
 import setupChatSocket from './socket/chatSocket';
+import { getAllowedOrigins, isAllowedOrigin } from './config/cors';
 
 dotenv.config();
 
@@ -49,15 +50,11 @@ const app = express();
 // Required for secure cookies behind Render's reverse proxy
 app.set('trust proxy', 1);
 
-const allowedOrigins = [
-    ...(process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim()) : []),
-    'http://localhost:5173',
-    'http://127.0.0.1:5173',
-];
+const allowedOrigins = getAllowedOrigins();
 
 app.use(cors({
     origin: (origin, callback) => {
-        if (!origin || allowedOrigins.includes(origin)) {
+        if (isAllowedOrigin(origin, allowedOrigins)) {
             callback(null, true);
         } else {
             callback(new Error(`CORS blocked: ${origin}`));

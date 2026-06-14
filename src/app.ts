@@ -20,6 +20,7 @@ import VerificationRoutes from './routes/VerificationRoutes';
 import PriceAnalyticsRoutes from './routes/PriceAnalyticsRoutes';
 import ExchangeRateRoutes from './routes/ExchangeRateRoutes';
 import PromotionRequestRoutes from './routes/PromotionRequestRoutes';
+import { getAllowedOrigins, isAllowedOrigin } from './config/cors';
 
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -29,11 +30,18 @@ cloudinary.config({
 
 export function createApp(sessionStore?: Store) {
     const app = express();
+    const allowedOrigins = getAllowedOrigins();
 
     app.set('trust proxy', 1);
 
     app.use(cors({
-        origin: process.env.ALLOWED_ORIGINS || 'http://localhost:5173',
+        origin: (origin, callback) => {
+            if (isAllowedOrigin(origin, allowedOrigins)) {
+                callback(null, true);
+            } else {
+                callback(new Error(`CORS blocked: ${origin}`));
+            }
+        },
         credentials: true,
         allowedHeaders: ['Content-Type', 'Authorization'],
         methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
