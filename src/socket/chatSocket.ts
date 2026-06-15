@@ -3,18 +3,57 @@ import { sendNotificationEmail } from '../emailService';
 import ChatModel from '../models/ChatModel';
 import User from '../models/UserModel';
 
+const getSocketUser = (socket: Socket) => (socket.request as any).session?.user;
+
+const canAccessChat = (chat: any, user: any) =>
+    Boolean(user?.id) &&
+    (user.role === 'admin' || chat.buyerId === user.id || chat.sellerId === user.id);
+
 const setupChatSocket = (io: Server) => {
     io.on('connection', (socket: Socket) => {
 
-        socket.on('join_chat', (chatId: string) => {
+        socket.on('join_chat', async (chatId: string) => {
+            const user = getSocketUser(socket);
+            if (!user?.id) {
+                socket.emit('chat_error', 'Unauthorized');
+                return;
+            }
+
+            const chat = await ChatModel.findById(chatId);
+            if (!chat || !canAccessChat(chat, user)) {
+                socket.emit('chat_error', 'Forbidden');
+                return;
+            }
+
             socket.join(chatId);
         });
 
         socket.on('send_message', async (data) => {
-            const { chatId, text, senderId, senderName } = data;
-            const newMessage = { senderId, senderName, text, timestamp: Date.now(), read: false };
+            const { chatId, text } = data;
+            const user = getSocketUser(socket);
 
             try {
+                if (!user?.id) {
+                    socket.emit('chat_error', 'Unauthorized');
+                    return;
+                }
+
+                const chatBeforeUpdate = await ChatModel.findById(chatId);
+                if (!chatBeforeUpdate || !canAccessChat(chatBeforeUpdate, user)) {
+                    socket.emit('chat_error', 'Forbidden');
+                    return;
+                }
+
+                const normalizedText = typeof text === 'string' ? text.trim() : '';
+                if (!normalizedText) {
+                    socket.emit('chat_error', 'Message text is required');
+                    return;
+                }
+
+                const senderId = user.id;
+                const senderName = user.name || 'User';
+                const newMessage = { senderId, senderName, text: normalizedText, timestamp: Date.now(), read: false };
+
                 const chat = await ChatModel.findByIdAndUpdate(
                     chatId,
                     { $push: { messages: newMessage } },
@@ -62,12 +101,24 @@ const setupChatSocket = (io: Server) => {
         });
 
         socket.on('messages_read', async (chatId: string) => {
+            const user = getSocketUser(socket);
+            if (!user?.id) {
+                socket.emit('chat_error', 'Unauthorized');
+                return;
+            }
+
+            const chat = await ChatModel.findById(chatId);
+            if (!chat || !canAccessChat(chat, user)) {
+                socket.emit('chat_error', 'Forbidden');
+                return;
+            }
+
             await ChatModel.updateOne(
                 { _id: chatId },
                 {
                     $set: { 'messages.$[elem].read': true, notified: false },
                 },
-                { arrayFilters: [{ 'elem.read': false }] }
+                { arrayFilters: [{ 'elem.read': false, 'elem.senderId': { $ne: user.id } }] }
             );
             io.to(chatId).emit('messages_read', chatId);
         });

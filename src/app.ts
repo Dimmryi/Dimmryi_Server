@@ -20,6 +20,7 @@ import VerificationRoutes from './routes/VerificationRoutes';
 import PriceAnalyticsRoutes from './routes/PriceAnalyticsRoutes';
 import ExchangeRateRoutes from './routes/ExchangeRateRoutes';
 import PromotionRequestRoutes from './routes/PromotionRequestRoutes';
+import AiEstimatorRoutes from './routes/AiEstimatorRoutes';
 import { getAllowedOrigins, isAllowedOrigin } from './config/cors';
 
 cloudinary.config({
@@ -79,6 +80,7 @@ export function createApp(sessionStore?: Store) {
     app.use(PriceAnalyticsRoutes);
     app.use(ExchangeRateRoutes);
     app.use(PromotionRequestRoutes);
+    app.use(AiEstimatorRoutes);
 
     app.get('/healthz', (req, res) => {
         res.json({ status: 'ok', message: 'Server is running' });

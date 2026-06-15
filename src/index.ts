@@ -25,6 +25,7 @@ import VerificationRoutes from './routes/VerificationRoutes';
 import PriceAnalyticsRoutes from './routes/PriceAnalyticsRoutes';
 import ExchangeRateRoutes from './routes/ExchangeRateRoutes';
 import PromotionRequestRoutes from './routes/PromotionRequestRoutes';
+import AiEstimatorRoutes from './routes/AiEstimatorRoutes';
 import setupChatSocket from './socket/chatSocket';
 import { getAllowedOrigins, isAllowedOrigin } from './config/cors';
 
@@ -69,7 +70,7 @@ app.use(express.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-app.use(session({
+const sessionMiddleware = session({
     secret: process.env.COOKIE_SECRET!,
     resave: false,
     saveUninitialized: false,
@@ -83,7 +84,9 @@ app.use(session({
         maxAge: 1000 * 60 * 60 * 24 * 7,
         sameSite: 'none',
     },
-}));
+});
+
+app.use(sessionMiddleware);
 
 mongoose.connect(process.env.MONGO_DB!)
     .then(() => console.log('Connected to MongoDB'))
@@ -107,6 +110,7 @@ app.use(VerificationRoutes);
 app.use(PriceAnalyticsRoutes);
 app.use(ExchangeRateRoutes);
 app.use(PromotionRequestRoutes);
+app.use(AiEstimatorRoutes);
 
 app.get('/healthz', (_req, res) => {
     res.json({ status: 'ok', message: 'Server is running' });
@@ -127,6 +131,10 @@ const io = new Server(httpServer, {
         origin: allowedOrigins,
         credentials: true,
     },
+});
+
+io.engine.use((req: any, res: any, next: (err?: any) => void) => {
+    sessionMiddleware(req, res, next);
 });
 
 setupChatSocket(io);

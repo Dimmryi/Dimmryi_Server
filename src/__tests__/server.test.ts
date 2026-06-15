@@ -279,13 +279,13 @@ describe('Auth endpoints', () => {
 // ---------------------------------------------------------------------------
 
 describe('Chat endpoints', () => {
-    it('POST /api/chat/init with missing fields → 400', async () => {
+    it('POST /api/chat/init without auth → 401', async () => {
         const res = await request(app).post('/api/chat/init').send({});
-        expect(res.status).toBe(400);
+        expect(res.status).toBe(401);
     });
 
-    it('GET /api/chat/:chatId with non-existent id → 404', async () => {
+    it('GET /api/chat/:chatId without auth → 401', async () => {
         const res = await request(app).get('/api/chat/000000000000000000000000');
-        expect(res.status).toBe(404);
+        expect(res.status).toBe(401);
     });
 });
