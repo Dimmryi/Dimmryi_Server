@@ -3,6 +3,7 @@ import { Request, Response } from 'express';
 import { v2 as cloudinary } from 'cloudinary';
 import Listing from '../models/ListingModel';
 import AgentModel from '../models/AgentModel';
+import TemporaryCloudinaryUploadModel from '../models/TemporaryCloudinaryUploadModel';
 
 const VERIFICATION_UPLOAD_PRESET = process.env.CLOUDINARY_VERIFICATION_PRESET || 'verification_documents_signed';
 const VERIFICATION_UPLOAD_FOLDER = process.env.CLOUDINARY_VERIFICATION_FOLDER || 'verification-documents';
@@ -42,6 +43,8 @@ const validateSignatureParams = (req: Request, res: Response) => {
 
     return { publicId: public_id.trim(), timestamp };
 };
+
+const normalizeResourceType = (value: unknown) => (value === 'video' ? 'video' : 'image');
 
 const canSignDeleteForAsset = async (req: any, publicId: string) => {
     const user = req.session?.user;
@@ -130,4 +133,78 @@ export const handleGenerateVerificationUploadSignature = (_req: Request, res: Re
         folder: VERIFICATION_UPLOAD_FOLDER,
         upload_preset: VERIFICATION_UPLOAD_PRESET,
     });
+};
+
+export const handleRegisterTemporaryUpload = async (req: any, res: Response) => {
+    try {
+        const userId = req.session?.user?.id;
+        const { publicId, url, resourceType, source } = req.body || {};
+
+        if (!userId) {
+            return res.status(401).json({ message: 'Unauthorized' });
+        }
+
+        if (!isValidPublicId(publicId)) {
+            return res.status(400).json({ message: 'Invalid Cloudinary publicId.' });
+        }
+
+        const normalizedResourceType = normalizeResourceType(resourceType);
+
+        const upload = await TemporaryCloudinaryUploadModel.findOneAndUpdate(
+            { publicId: publicId.trim(), resourceType: normalizedResourceType },
+            {
+                $set: {
+                    userId,
+                    url: typeof url === 'string' ? url : '',
+                    source: typeof source === 'string' ? source : 'listing-form',
+                    status: 'pending',
+                    lastCleanupError: '',
+                    deletedAt: null,
+                    committedAt: null,
+                },
+                $setOnInsert: {
+                    cleanupAttempts: 0,
+                },
+            },
+            { new: true, upsert: true, runValidators: true },
+        );
+
+        res.status(201).json({ ok: true, id: upload._id });
+    } catch (error) {
+        console.error('Temporary Cloudinary upload registration failed:', error);
+        res.status(500).json({ message: 'Could not register temporary upload.' });
+    }
+};
+
+export const handleMarkTemporaryUploadDeleted = async (req: any, res: Response) => {
+    try {
+        const userId = req.session?.user?.id;
+        const { publicId, resourceType } = req.body || {};
+
+        if (!userId) {
+            return res.status(401).json({ message: 'Unauthorized' });
+        }
+
+        if (!isValidPublicId(publicId)) {
+            return res.status(400).json({ message: 'Invalid Cloudinary publicId.' });
+        }
+
+        const normalizedResourceType = normalizeResourceType(resourceType);
+
+        await TemporaryCloudinaryUploadModel.updateMany(
+            { userId, publicId: publicId.trim(), resourceType: normalizedResourceType },
+            {
+                $set: {
+                    status: 'deleted',
+                    deletedAt: new Date(),
+                    lastCleanupError: '',
+                },
+            },
+        );
+
+        res.json({ ok: true });
+    } catch (error) {
+        console.error('Temporary Cloudinary upload delete mark failed:', error);
+        res.status(500).json({ message: 'Could not update temporary upload state.' });
+    }
 };

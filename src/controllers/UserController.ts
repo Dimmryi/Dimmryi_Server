@@ -9,6 +9,7 @@ import {
     deleteVerificationDocumentsForListings,
     deleteVerificationDocumentsForUser,
 } from '../utils/verificationDocumentsCleanup';
+import { markTemporaryUploadsCommittedForListing } from '../utils/temporaryCloudinaryUploads';
 
 const normalizeCurrency = (value: unknown) => (value === 'USD' ? 'USD' : 'UAH');
 
@@ -156,6 +157,10 @@ export const handlePostedAndEditUser = async (req: any, res: any) => {
             { $set: allowedUpdates },
             { new: true, runValidators: true }
         );
+
+        await markTemporaryUploadsCommittedForListing(updatedListing, currentUserId || existingListing.ownerId).catch((error) => {
+            console.error('Temporary upload commit failed:', error);
+        });
 
         res.json(updatedListing);
     } catch (error) {

@@ -4,6 +4,8 @@ import {
     handleGenerateSignatureVideo,
     handleGenerateSignatureDeleteVideo,
     handleGenerateVerificationUploadSignature,
+    handleMarkTemporaryUploadDeleted,
+    handleRegisterTemporaryUpload,
 } from '../controllers/CloudinaryController';
 import { requireAuth } from '../middlewares/AuthMiddleware';
 
@@ -16,5 +18,7 @@ router.post('/api/cloudinary/signature', requireAuth, handleGenerateSignature);
 router.post('/api/cloudinary/video-signature', requireAuth, handleGenerateSignatureVideo);
 router.post('/api/cloudinary/video-delete-signature', requireAuth, handleGenerateSignatureDeleteVideo);
 router.post('/api/cloudinary/verification-signature', requireAuth, handleGenerateVerificationUploadSignature);
+router.post('/api/cloudinary/temporary-upload', requireAuth, handleRegisterTemporaryUpload);
+router.post('/api/cloudinary/temporary-upload/deleted', requireAuth, handleMarkTemporaryUploadDeleted);
 
 export default router;

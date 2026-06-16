@@ -28,6 +28,7 @@ import PromotionRequestRoutes from './routes/PromotionRequestRoutes';
 import AiEstimatorRoutes from './routes/AiEstimatorRoutes';
 import setupChatSocket from './socket/chatSocket';
 import { getAllowedOrigins, isAllowedOrigin } from './config/cors';
+import { startTemporaryUploadsCleanupJob } from './utils/temporaryCloudinaryUploads';
 
 dotenv.config();
 
@@ -139,11 +140,14 @@ io.engine.use((req: any, res: any, next: (err?: any) => void) => {
 
 setupChatSocket(io);
 
+const stopTemporaryUploadsCleanupJob = startTemporaryUploadsCleanupJob();
+
 httpServer.listen(port, '0.0.0.0', () => {
     console.log(`Server running on http://0.0.0.0:${port}`);
 });
 
 const gracefulShutdown = () => {
+    stopTemporaryUploadsCleanupJob();
     httpServer.close(() => {
         mongoose.connection.close();
         process.exit(0);

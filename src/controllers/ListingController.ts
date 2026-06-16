@@ -9,6 +9,7 @@ import User from '../models/UserModel';
 import { getNextListingNumber } from '../utils/getNextListingNumber';
 import { sendNotificationEmail } from '../emailService';
 import { deleteVerificationDocumentsForListings } from '../utils/verificationDocumentsCleanup';
+import { markTemporaryUploadsCommittedForListing } from '../utils/temporaryCloudinaryUploads';
 import { getUsdUahRate } from './ExchangeRateController';
 
 const MAX_NOTIFICATION_EMAILS_PER_DAY = 4;
@@ -418,6 +419,9 @@ export const handlePostListings = async (req: any, res: any) => {
             video: normalizeStringArray(video),
         });
         await listing.save();
+        await markTemporaryUploadsCommittedForListing(listing, req.session?.user?.id || rest.ownerId).catch((error) => {
+            console.error('Temporary upload commit failed:', error);
+        });
         res.json({ message: 'Listing added with multiple images!' });
     } catch (error) {
         res.status(500).json({ error: 'Server error' });
@@ -438,6 +442,9 @@ export const handlePostListingsWithComparison = async (req: Request, res: Respon
             date: Date.now(),
         });
         await newListing.save();
+        await markTemporaryUploadsCommittedForListing(newListing, (req as any).session?.user?.id || rest.ownerId).catch((error) => {
+            console.error('Temporary upload commit failed:', error);
+        });
 
         const listingPriceInUah = await getListingPriceInUah(newListing);
         const notifications = await NotificationModel.find(buildNotificationQuery(newListing, listingPriceInUah));
@@ -551,6 +558,10 @@ export const handleUpdateListingById = async (req: any, res: any) => {
             { $set: allowedUpdates },
             { new: true, runValidators: true }
         );
+
+        await markTemporaryUploadsCommittedForListing(updatedListing, currentUserId || existingListing.ownerId).catch((error) => {
+            console.error('Temporary upload commit failed:', error);
+        });
 
         res.json(updatedListing);
     } catch (error) {
