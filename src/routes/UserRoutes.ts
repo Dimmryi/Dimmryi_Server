@@ -12,7 +12,7 @@ const router = express.Router();
 
 router.delete('/api/users/name/:userName', handleDeleteUserByUserName);
 router.delete('/api/users/:userId', requireOwnerOrAdmin('userId'), handleDeleteUserByUserId);
-router.delete('/api/users/:userId/full', handleDeleteUserAndAllByUserId);
+router.delete('/api/users/:userId/full', requireOwnerOrAdmin('userId'), handleDeleteUserAndAllByUserId);
 router.post('/api/usersBase', handlePostUsersToBase);
 router.put('/api/listings/:id', handlePostedAndEditUser);
 

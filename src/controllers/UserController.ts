@@ -5,11 +5,23 @@ import User from '../models/UserModel';
 import ListingModel from '../models/ListingModel';
 import CommentModel from '../models/CommentModel';
 import NotificationModel from '../models/NotificationModel';
+import FavoriteModel from '../models/FavoriteModel';
+import AgentModel from '../models/AgentModel';
+import PromotionRequestModel from '../models/PromotionRequestModel';
+import ChatModel from '../models/ChatModel';
+import AiEstimatorUsageModel from '../models/AiEstimatorUsageModel';
+import NotificationEmailLogModel from '../models/NotificationEmailLogModel';
 import {
     deleteVerificationDocumentsForListings,
     deleteVerificationDocumentsForUser,
 } from '../utils/verificationDocumentsCleanup';
-import { markTemporaryUploadsCommittedForListing } from '../utils/temporaryCloudinaryUploads';
+import {
+    collectCloudinaryAssetsFromUrls,
+    collectListingCloudinaryAssets,
+    deleteTemporaryCloudinaryUploadsForUser,
+    destroyCloudinaryAssets,
+    markTemporaryUploadsCommittedForListing,
+} from '../utils/temporaryCloudinaryUploads';
 
 const normalizeCurrency = (value: unknown) => (value === 'USD' ? 'USD' : 'UAH');
 
@@ -57,14 +69,62 @@ export const handleDeleteUserAndAllByUserId = async (req: any, res: any) => {
             return res.status(400).json({ message: `Invalid ID format: ${userId}` });
         }
         const objectId = new mongoose.Types.ObjectId(userId);
-
-        const listings = await ListingModel.find({ ownerId: { $in: [userId, objectId] } }).select('_id').lean();
+        const ownerIdValues: Array<string | mongoose.Types.ObjectId> = [userId, objectId];
+        const user = await User.findById(objectId).lean();
+        const listings = await ListingModel.find({ ownerId: { $in: ownerIdValues } }).lean();
         const listingIds = listings.map((listing: any) => String(listing._id));
+        const listingObjectIds = listings.map((listing: any) => listing._id).filter(Boolean);
+        const listingMediaAssets = listings.flatMap((listing: any) => collectListingCloudinaryAssets(listing));
+        const agentProfiles = await AgentModel.find({ userId }).lean();
+        const agentMediaAssets = agentProfiles.flatMap((agent: any) => collectCloudinaryAssetsFromUrls(agent.image, 'image'));
+        const notificationIds = (await NotificationModel.find({ userId }).select('_id email').lean()).map((notification: any) => ({
+            id: String(notification._id),
+            email: String(notification.email || ''),
+        }));
+        const emailsForCleanup = Array.from(
+            new Set([String(user?.email || ''), ...notificationIds.map((notification) => notification.email)].filter(Boolean)),
+        );
+
+        await destroyCloudinaryAssets([...listingMediaAssets, ...agentMediaAssets]);
 
         await deleteVerificationDocumentsForListings(listingIds);
         await deleteVerificationDocumentsForUser(userId);
-        await ListingModel.deleteMany({ ownerId: { $in: [userId, objectId] } });
-        await CommentModel.deleteMany({ authorId: { $in: [userId, objectId] } });
+        await deleteTemporaryCloudinaryUploadsForUser(userId);
+        await FavoriteModel.deleteMany({
+            $or: [
+                { userId },
+                { listingId: { $in: listingObjectIds } },
+            ],
+        });
+        await ChatModel.deleteMany({
+            $or: [
+                { buyerId: userId },
+                { sellerId: userId },
+                { listingId: { $in: listingIds } },
+            ],
+        });
+        await PromotionRequestModel.deleteMany({
+            $or: [
+                { userId },
+                { listingId: { $in: listingIds } },
+            ],
+        });
+        await AiEstimatorUsageModel.deleteMany({ userId });
+        await NotificationEmailLogModel.deleteMany({
+            $or: [
+                { email: { $in: emailsForCleanup } },
+                { notificationId: { $in: notificationIds.map((notification) => notification.id) } },
+                { listingId: { $in: listingIds } },
+            ],
+        });
+        await AgentModel.deleteMany({ userId });
+        await ListingModel.deleteMany({ ownerId: { $in: ownerIdValues } });
+        await CommentModel.deleteMany({
+            $or: [
+                { authorId: { $in: [userId, objectId] } },
+                { listingId: { $in: listingIds } },
+            ],
+        });
         await NotificationModel.deleteMany({ userId });
         const deleted = await User.deleteMany({ _id: objectId });
 

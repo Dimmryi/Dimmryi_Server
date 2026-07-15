@@ -29,7 +29,13 @@ const normalizeStringArray = (value: unknown): string[] => {
     return typeof value === 'string' && value.trim() !== '' ? [value] : [];
 };
 
-const getPublicIdsFromListing = (listing: any) => {
+export const collectCloudinaryAssetsFromUrls = (value: unknown, resourceType: ResourceType = 'image') =>
+    normalizeStringArray(value)
+        .map(getCloudinaryPublicIdFromUrl)
+        .filter(Boolean)
+        .map((publicId) => ({ publicId, resourceType }));
+
+export const collectListingCloudinaryAssets = (listing: any) => {
     const imageIds = normalizeStringArray(listing?.image)
         .map(getCloudinaryPublicIdFromUrl)
         .filter(Boolean)
@@ -44,11 +50,45 @@ const getPublicIdsFromListing = (listing: any) => {
     return [...imageIds, ...videoIds];
 };
 
+export const destroyCloudinaryAssets = async (
+    assets: Array<{ publicId: string; resourceType: ResourceType }>,
+) => {
+    const uniqueAssets = Array.from(
+        new Map(
+            assets
+                .filter((asset) => asset.publicId)
+                .map((asset) => [`${asset.resourceType}:${asset.publicId}`, asset]),
+        ).values(),
+    );
+
+    if (uniqueAssets.length === 0) return;
+
+    const results = await Promise.allSettled(
+        uniqueAssets.map((asset) =>
+            cloudinary.uploader.destroy(asset.publicId, {
+                resource_type: asset.resourceType,
+                invalidate: true,
+            }),
+        ),
+    );
+
+    const failed = results.filter((result) => {
+        if (result.status === 'rejected') return true;
+
+        const cloudinaryResult = String(result.value?.result || '');
+        return cloudinaryResult !== 'ok' && cloudinaryResult !== 'not found';
+    });
+
+    if (failed.length > 0) {
+        throw new Error(`Failed to delete ${failed.length} Cloudinary asset(s).`);
+    }
+};
+
 export const markTemporaryUploadsCommittedForListing = async (listing: any, userId?: string) => {
     const ownerId = userId || String(listing?.ownerId || '');
     if (!ownerId) return;
 
-    const assets = getPublicIdsFromListing(listing);
+    const assets = collectListingCloudinaryAssets(listing);
     if (assets.length === 0) return;
 
     const now = new Date();
@@ -119,6 +159,28 @@ export const cleanupTemporaryCloudinaryUploads = async () => {
             });
         }
     }
+};
+
+export const deleteTemporaryCloudinaryUploadsForUser = async (userId: string) => {
+    if (!userId) return { deletedAssets: 0, deletedRecords: 0 };
+
+    const uploads = await TemporaryCloudinaryUploadModel.find({
+        userId,
+        status: { $ne: 'deleted' },
+    }).lean();
+
+    await destroyCloudinaryAssets(
+        uploads.map((upload) => ({
+            publicId: String(upload.publicId || ''),
+            resourceType: normalizeResourceType(upload.resourceType),
+        })),
+    );
+
+    const deleted = await TemporaryCloudinaryUploadModel.deleteMany({ userId });
+    return {
+        deletedAssets: uploads.length,
+        deletedRecords: deleted.deletedCount || 0,
+    };
 };
 
 export const startTemporaryUploadsCleanupJob = () => {
